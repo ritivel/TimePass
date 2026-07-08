@@ -7,18 +7,13 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:genui/genui.dart';
 import 'package:http/http.dart' as http;
 
-/// Android emulators reach the host machine via 10.0.2.2.
+/// localhost:8000 everywhere. On Android (device OR emulator) bridge the
+/// port first: `adb reverse tcp:8000 tcp:8000`. Override with
+/// `--dart-define=TIMEPASS_API=http://<host>:8000` (e.g. laptop LAN IP).
 String defaultBaseUrl() {
-  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-    return const String.fromEnvironment(
-      'TIMEPASS_API',
-      defaultValue: 'http://10.0.2.2:8000',
-    );
-  }
   return const String.fromEnvironment(
     'TIMEPASS_API',
     defaultValue: 'http://localhost:8000',
