@@ -1,0 +1,378 @@
+# TimePass component catalog — SOURCE OF TRUTH (M0 subset)
+# Full contract with wireframes and rationale: COMPONENT_CATALOG.md
+# Regenerate artifacts after editing:  uv run catalog/generator/generate.py
+#
+# Prop spec keys:
+#   type:      string | number | integer | boolean | object | array | children | childId | action
+#   required:  bool (default false)
+#   dynamic:   bool (default true for string/number/integer/boolean) — literal OR {path} binding
+#   enum:      allowed values (string props)
+#   fields:    nested prop map (object / array-item shape)
+#   items:     item spec for arrays (type or {fields})
+#   minItems / maxItems, default, description
+
+catalogId: "https://timepass.app/catalogs/core/v1"
+protocol: "v0.9.1"
+
+# Model-facing composition rules — compiled verbatim into the system prompt.
+# Keep under ~600 tokens (COMPONENT_CATALOG.md §9).
+instructions: |
+  You compose answer surfaces from the components in this catalog. Rules:
+  1. The surface root is one Column with id "root". Order of its children:
+     optional Notice (compliance), 1-8 answer blocks, optional single action
+     component, optional SourceChips, optional AdSlot (never first), and
+     FollowUpChips last (include it by default with 2-4 suggestions).
+  2. Only Row, Column, Card, List have children; Card and Button take one child.
+     All other components are leaves — never put components inside them.
+  3. Limits: nesting depth <= 4, <= 40 components, Row <= 4 children,
+     <= 2 hero components, <= 1 action component per surface.
+  4. Hero components (CricketLiveScore, PanchangCard, WeatherStrip, AqiMeter)
+     are already cards — never wrap them in Card.
+  5. If CricketLiveScore is present, the root MUST start with
+     Notice(variant: legal) disclosing the score delay.
+  6. Bind hero data with {"path": "/..."} references into the data model the
+     server provides — do not copy data values into component props.
+  7. Every user-visible string must be in the requested output language.
+     Use Latin digits. Never invent URLs; only use server-provided link fields.
+  8. Prefer one coarse hero component over rebuilding it from primitives.
+     For prose answers (letters, explanations) use Markdown — cards are not
+     mandatory. For labeled facts use KeyValueGrid.
+
+components:
+
+  # ── Layer 0: primitives (adopted from Basic Catalog, narrowed) ──────────
+
+  Text:
+    layer: primitive
+    m0: true
+    adopted: true
+    description: Single-style text run. h1 is reserved for the surface title.
+    props:
+      text: {type: string, required: true, description: Text content.}
+      variant: {type: string, enum: [h1, h2, h3, body, caption, label], default: body}
+
+  Markdown:
+    layer: primitive
+    m0: true
+    adopted: true
+    description: >
+      Prose answers (letters, explanations, drafts). GFM subset: bold, italic,
+      lists, tables, links. No raw HTML, no images.
+    props:
+      text: {type: string, required: true, description: Markdown source.}
+
+  Image:
+    layer: primitive
+    m0: true
+    adopted: true
+    description: Remote image. https URLs from server-provided fields only.
+    props:
+      url: {type: string, required: true}
+      alt: {type: string}
+      variant: {type: string, enum: [avatar, thumbnail, feature, hero], default: thumbnail}
+      fit: {type: string, enum: [cover, contain], default: cover}
+
+  Icon:
+    layer: primitive
+    m0: true
+    adopted: true
+    description: Named icon from the app icon set.
+    props:
+      name:
+        type: string
+        required: true
+        enum: [sun, moon, cloud, rain, storm, wind, humidity, temperature,
+               cricket, train, calendar, clock, warning, info, check, star,
+               location, chevronRight, refresh, sparkle]
+      size: {type: string, enum: [sm, md, lg], default: md}
+
+  Row:
+    layer: primitive
+    m0: true
+    adopted: true
+    container: children
+    description: Horizontal layout. Max 4 children.
+    props:
+      children: {type: children, required: true, maxItems: 4}
+      justify: {type: string, enum: [start, center, end, spaceBetween], default: start}
+      align: {type: string, enum: [start, center, end], default: center}
+      gap: {type: string, enum: [none, sm, md, lg], default: sm}
+      wrap: {type: boolean, default: false}
+
+  Column:
+    layer: primitive
+    m0: true
+    adopted: true
+    container: children
+    description: Vertical layout. The surface root is a Column with id "root".
+    props:
+      children: {type: children, required: true}
+      justify: {type: string, enum: [start, center, end, spaceBetween], default: start}
+      align: {type: string, enum: [start, center, end, stretch], default: stretch}
+      gap: {type: string, enum: [none, sm, md, lg], default: md}
+
+  Card:
+    layer: primitive
+    m0: true
+    adopted: true
+    container: child
+    description: Grouping container; tappable when action is set. Never wrap hero components.
+    props:
+      child: {type: childId, required: true}
+      variant: {type: string, enum: [elevated, outlined, filled], default: outlined}
+      action: {type: action}
+
+  List:
+    layer: primitive
+    m0: true
+    adopted: true
+    container: children
+    description: Scrollable list of children; horizontal = generic rail.
+    props:
+      children: {type: children, required: true}
+      direction: {type: string, enum: [vertical, horizontal], default: vertical}
+
+  Button:
+    layer: primitive
+    m0: true
+    adopted: true
+    container: child
+    description: Generic action trigger.
+    props:
+      child: {type: childId, required: true}
+      action: {type: action, required: true}
+      variant: {type: string, enum: [primary, secondary, text, destructive], default: primary}
+      enabled: {type: boolean, default: true}
+
+  Divider:
+    layer: primitive
+    m0: true
+    adopted: true
+    description: Visual separator.
+    props: {}
+
+  # ── Layer 1: generic answer components (M0 subset) ──────────────────────
+
+  KeyValueGrid:
+    layer: generic
+    m0: true
+    description: Labeled facts in a 1-2 column grid. The generic-tier workhorse.
+    props:
+      title: {type: string}
+      columns: {type: integer, enum: [1, 2], default: 2}
+      items:
+        type: array
+        required: true
+        minItems: 1
+        maxItems: 12
+        items:
+          fields:
+            label: {type: string, required: true}
+            value: {type: string, required: true}
+            icon: {type: string}
+            emphasis: {type: boolean, default: false}
+
+  Notice:
+    layer: generic
+    m0: true
+    description: >
+      Callout for info/warnings and mandatory compliance disclosures
+      (cricket lag, astrology disclaimer).
+    props:
+      text: {type: string, required: true}
+      variant: {type: string, required: true, enum: [info, warning, legal, success]}
+      icon: {type: string}
+      dense: {type: boolean, default: false}
+
+  FollowUpChips:
+    layer: generic
+    m0: true
+    description: >
+      Suggested next queries; always the last child of the root Column.
+      Tapping a chip sends its query as a new user message.
+    props:
+      suggestions:
+        type: array
+        required: true
+        minItems: 2
+        maxItems: 4
+        items:
+          fields:
+            label: {type: string, required: true, description: Short chip text in output language.}
+            query: {type: string, required: true, description: Full query to run when tapped.}
+    events:
+      follow_up_selected: {query: string}
+
+  # ── Layer 2: hero components (M0 subset) ────────────────────────────────
+
+  CricketLiveScore:
+    layer: hero
+    m0: true
+    description: >
+      Live match card. Data arrives via the surface data model (adapter-fed,
+      auto-refreshing); props are normally {path} bindings. Requires a legal
+      Notice on the surface disclosing lagSeconds.
+    props:
+      matchId: {type: string, required: true, dynamic: false}
+      matchTitle: {type: string, required: true, description: e.g. "IND vs AUS · 3rd T20I"}
+      statusText: {type: string, required: true, description: Localized state line, e.g. "IND need 43 off 30".}
+      teams:
+        type: array
+        required: true
+        minItems: 2
+        maxItems: 2
+        items:
+          fields:
+            name: {type: string, required: true}
+            shortName: {type: string, required: true}
+            logoUrl: {type: string}
+            scoreText: {type: string, description: e.g. "186/4"}
+            oversText: {type: string, description: e.g. "17.2"}
+      batters:
+        type: array
+        maxItems: 2
+        items:
+          fields:
+            name: {type: string, required: true}
+            runsText: {type: string, required: true, description: e.g. "52*"}
+            ballsText: {type: string}
+            onStrike: {type: boolean, default: false}
+      bowler:
+        type: object
+        fields:
+          name: {type: string, required: true}
+          figuresText: {type: string, description: e.g. "2/34"}
+          oversText: {type: string}
+      recentBalls:
+        type: array
+        maxItems: 6
+        items: {type: string}
+      lagSeconds: {type: number, required: true, description: Configured display lag; drives the legal Notice.}
+      updatedAtText: {type: string, required: true}
+
+  PanchangCard:
+    layer: hero
+    m0: true
+    description: >
+      Daily panchang for a location. All times pre-formatted and localized by
+      the adapter (cacheable per city+date).
+    props:
+      dateText: {type: string, required: true, description: Localized date incl. lunar calendar.}
+      locationName: {type: string, required: true}
+      tithi:
+        type: object
+        required: true
+        fields:
+          name: {type: string, required: true}
+          endsAtText: {type: string}
+      nakshatra:
+        type: object
+        required: true
+        fields:
+          name: {type: string, required: true}
+          endsAtText: {type: string}
+      yoga:
+        type: object
+        fields:
+          name: {type: string, required: true}
+          endsAtText: {type: string}
+      karana:
+        type: object
+        fields:
+          name: {type: string, required: true}
+          endsAtText: {type: string}
+      sunriseText: {type: string, required: true}
+      sunsetText: {type: string, required: true}
+      rahuKalam:
+        type: object
+        required: true
+        fields:
+          startText: {type: string, required: true}
+          endText: {type: string, required: true}
+      festivals:
+        type: array
+        maxItems: 3
+        items: {type: string}
+      variant: {type: string, enum: [compact, full], default: full}
+
+  WeatherStrip:
+    layer: hero
+    m0: true
+    description: Current conditions + multi-day forecast for one location.
+    props:
+      locationName: {type: string, required: true}
+      current:
+        type: object
+        required: true
+        fields:
+          tempText: {type: string, required: true}
+          condition:
+            type: string
+            required: true
+            enum: [clear, partlyCloudy, cloudy, mist, haze, rain, heavyRain, thunderstorm, snow]
+          conditionText: {type: string, required: true, description: Localized condition line.}
+          feelsLikeText: {type: string}
+          humidityText: {type: string}
+          windText: {type: string}
+      days:
+        type: array
+        required: true
+        minItems: 3
+        maxItems: 7
+        items:
+          fields:
+            dayLabel: {type: string, required: true}
+            minText: {type: string, required: true}
+            maxText: {type: string, required: true}
+            condition:
+              type: string
+              required: true
+              enum: [clear, partlyCloudy, cloudy, mist, haze, rain, heavyRain, thunderstorm, snow]
+            rainPctText: {type: string}
+      alerts:
+        type: array
+        maxItems: 3
+        items:
+          fields:
+            severity: {type: string, required: true, enum: [watch, warning]}
+            text: {type: string, required: true}
+
+  AqiMeter:
+    layer: hero
+    m0: true
+    description: AQI gauge (CPCB scale) with health advice.
+    props:
+      locationName: {type: string, required: true}
+      aqi: {type: number, required: true}
+      category:
+        type: string
+        required: true
+        enum: [good, satisfactory, moderate, poor, veryPoor, severe]
+        description: CPCB category; drives the color band.
+      categoryText: {type: string, required: true, description: Localized category label.}
+      dominantPollutant: {type: string}
+      stationName: {type: string}
+      updatedAtText: {type: string, required: true}
+      healthAdviceText: {type: string, required: true}
+
+# Post-M0 components reserved by COMPONENT_CATALOG.md §4 (names are frozen;
+# adding one = define here + implement CatalogItem + design pass):
+reserved:
+  - ComparisonTable
+  - Checklist
+  - MediaCarousel
+  - MapCard
+  - ChartCard
+  - SourceChips
+  - CricketMatchSummary
+  - TrainStatusTimeline
+  - PnrStatusCard
+  - MuhuratList
+  - HoroscopeCard
+  - PriceTicker
+  - RecipeCard
+  - UpiPayButton
+  - AffiliateCta
+  - ConsultReferralCard
+  - DeepLinkCard
+  - AdSlot

@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+uv.lock
+
+# Flutter / Dart
+app/.dart_tool/
+app/build/
+app/.flutter-plugins*
+app/android/.gradle/
+app/ios/Pods/
+*.iml
+
+# Generated artifacts (rebuilt by catalog/generator)
+catalog/dist/
+
+# Secrets & local env
+.env
+*.local
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
