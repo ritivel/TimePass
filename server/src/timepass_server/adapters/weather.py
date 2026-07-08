@@ -80,8 +80,8 @@ async def get_weather(query: str, lang: str, city: str = "Hyderabad") -> dict[st
     return data
 
 
-async def get_aqi(query: str, lang: str, city: str = "Delhi") -> dict[str, Any]:
-    """Returns the AqiMeter payload for the data model (CPCB scale)."""
+async def get_aqi_fixture(query: str, lang: str, city: str = "Delhi") -> dict[str, Any]:
+    """Fixture AqiMeter payload — fallback when adapters.aqi has no key/data."""
     loc = dict(_AQI[lang])
     return {
         "locationName": f"Anand Vihar, {city}" if city == "Delhi" else city,

@@ -184,11 +184,13 @@ _AQI_CHIPS = {
         {"label": "వాతావరణం", "query": "నేటి వాతావరణం"},
     ],
 }
-_AQI_CAPTION = {
-    "en": "Air quality is poor at 287 — better to mask up outdoors.",
-    "hi": "वायु गुणवत्ता खराब है, 287 — बाहर मास्क पहनना बेहतर है।",
-    "te": "గాలి నాణ్యత పేలవం, 287 — బయట మాస్క్ మంచిది.",
-}
+def _aqi_caption(data: dict[str, Any], lang: Lang) -> str:
+    city, aqi, cat = data["locationName"], data["aqi"], data["categoryText"]
+    return {
+        "en": f"Air quality in {city} is {cat.lower()} at {aqi}.",
+        "hi": f"{city} में वायु गुणवत्ता {cat} है, AQI {aqi}।",
+        "te": f"{city}లో గాలి నాణ్యత {cat}, AQI {aqi}.",
+    }[lang]
 
 
 def aqi_surface(data: dict[str, Any], lang: Lang):
@@ -208,4 +210,4 @@ def aqi_surface(data: dict[str, Any], lang: Lang):
         },
         _chips(_AQI_CHIPS[lang]),
     ]
-    return _AQI_CAPTION[lang], components, {"aqi": data}
+    return _aqi_caption(data, lang), components, {"aqi": data}

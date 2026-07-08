@@ -173,6 +173,48 @@ def test_rejects_missing_root():
         validate_surface([{"id": "a", "component": "Divider"}])
 
 
+# ── CPCB AQI adapter (no network — canned records) ─────────────────────────
+
+def test_aqi_city_rollup_and_categories():
+    from timepass_server.adapters.aqi import category_for, city_from_query, summarize_records
+
+    records = [
+        # station A: PM2.5 dominant, AQI 210
+        {"station": "A", "pollutant_id": "PM2.5", "avg_value": "210",
+         "last_update": "08-07-2026 21:00:00"},
+        {"station": "A", "pollutant_id": "CO", "avg_value": "40",
+         "last_update": "08-07-2026 21:00:00"},
+        # station B: NA row ignored; OZONE 90
+        {"station": "B", "pollutant_id": "SO2", "avg_value": "NA",
+         "last_update": "08-07-2026 21:00:00"},
+        {"station": "B", "pollutant_id": "OZONE", "avg_value": "90",
+         "last_update": "08-07-2026 21:00:00"},
+    ]
+    summary = summarize_records(records)
+    assert summary is not None
+    assert summary["aqi"] == 150  # mean(210, 90)
+    assert summary["dominant"] in ("PM2.5", "OZONE")
+    assert summary["stationCount"] == 2
+
+    assert category_for(45) == "good"
+    assert category_for(150) == "moderate"
+    assert category_for(287) == "poor"
+    assert category_for(999) == "severe"
+
+    assert city_from_query("hyderabad ka aqi") == "Hyderabad"
+    assert city_from_query("दिल्ली प्रदूषण") == "Delhi"
+    assert city_from_query("air quality") == "Delhi"  # default
+
+
+def test_aqi_all_na_returns_none():
+    from timepass_server.adapters.aqi import summarize_records
+
+    assert summarize_records(
+        [{"station": "A", "pollutant_id": "SO2", "avg_value": "NA",
+          "last_update": "08-07-2026 21:00:00"}]
+    ) is None
+
+
 # ── LLM output normalization ───────────────────────────────────────────────
 
 def test_flatten_nested_llm_output():

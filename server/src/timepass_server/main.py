@@ -22,7 +22,7 @@ from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from . import a2ui, llm, templates
-from .adapters import cricket, panchang, weather
+from .adapters import aqi, cricket, panchang, weather
 from .router import Category, route
 from .validator import SurfaceValidationError, catalog_id, validate_surface
 
@@ -75,7 +75,7 @@ async def query(req: QueryRequest) -> StreamingResponse:
         data = await weather.get_weather(req.query, req.lang)
         caption, components, data_model = templates.weather_surface(data, req.lang)
     else:  # Category.AQI
-        data = await weather.get_aqi(req.query, req.lang)
+        data = await aqi.get_aqi(req.query, req.lang)
         caption, components, data_model = templates.aqi_surface(data, req.lang)
 
     # Fail closed: a hero template failing validation is a server bug, never
