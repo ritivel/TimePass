@@ -8,16 +8,40 @@
 const String catalogId = 'https://timepass.app/catalogs/core/v1';
 
 const Map<String, Map<String, Object?>> componentSchemas = {
+  'Markdown': <String, Object?>{
+    'type': 'object',
+    'description': 'Prose answers (letters, explanations, drafts). GFM subset: bold, italic, lists, tables, links. No raw HTML, no images.',
+    'properties': <String, Object?>{
+      'text': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'string',
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+        'description': 'Markdown source.',
+      },
+    },
+    'required': <Object?>[
+      'text',
+    ],
+  },
   'KeyValueGrid': <String, Object?>{
     'type': 'object',
     'description': 'Labeled facts in a 1-2 column grid. The generic-tier workhorse.',
     'properties': <String, Object?>{
-      'id': <String, Object?>{
-        'type': 'string',
-      },
-      'component': <String, Object?>{
-        'const': 'KeyValueGrid',
-      },
       'title': <String, Object?>{
         'oneOf': <Object?>[
           <String, Object?>{
@@ -178,22 +202,13 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       },
     },
     'required': <Object?>[
-      'id',
-      'component',
       'items',
     ],
-    'additionalProperties': false,
   },
   'Notice': <String, Object?>{
     'type': 'object',
     'description': 'Callout for info/warnings and mandatory compliance disclosures (cricket lag, astrology disclaimer).',
     'properties': <String, Object?>{
-      'id': <String, Object?>{
-        'type': 'string',
-      },
-      'component': <String, Object?>{
-        'const': 'Notice',
-      },
       'text': <String, Object?>{
         'oneOf': <Object?>[
           <String, Object?>{
@@ -283,23 +298,14 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       },
     },
     'required': <Object?>[
-      'id',
-      'component',
       'text',
       'variant',
     ],
-    'additionalProperties': false,
   },
   'FollowUpChips': <String, Object?>{
     'type': 'object',
     'description': 'Suggested next queries; always the last child of the root Column. Tapping a chip sends its query as a new user message.',
     'properties': <String, Object?>{
-      'id': <String, Object?>{
-        'type': 'string',
-      },
-      'component': <String, Object?>{
-        'const': 'FollowUpChips',
-      },
       'suggestions': <String, Object?>{
         'oneOf': <Object?>[
           <String, Object?>{
@@ -376,22 +382,13 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       },
     },
     'required': <Object?>[
-      'id',
-      'component',
       'suggestions',
     ],
-    'additionalProperties': false,
   },
   'CricketLiveScore': <String, Object?>{
     'type': 'object',
     'description': 'Live match card. Data arrives via the surface data model (adapter-fed, auto-refreshing); props are normally {path} bindings. Requires a legal Notice on the surface disclosing lagSeconds.',
     'properties': <String, Object?>{
-      'id': <String, Object?>{
-        'type': 'string',
-      },
-      'component': <String, Object?>{
-        'const': 'CricketLiveScore',
-      },
       'matchId': <String, Object?>{
         'type': 'string',
       },
@@ -855,8 +852,6 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       },
     },
     'required': <Object?>[
-      'id',
-      'component',
       'matchId',
       'matchTitle',
       'statusText',
@@ -864,18 +859,11 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       'lagSeconds',
       'updatedAtText',
     ],
-    'additionalProperties': false,
   },
   'PanchangCard': <String, Object?>{
     'type': 'object',
     'description': 'Daily panchang for a location. All times pre-formatted and localized by the adapter (cacheable per city+date).',
     'properties': <String, Object?>{
-      'id': <String, Object?>{
-        'type': 'string',
-      },
-      'component': <String, Object?>{
-        'const': 'PanchangCard',
-      },
       'dateText': <String, Object?>{
         'oneOf': <Object?>[
           <String, Object?>{
@@ -1356,8 +1344,6 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       },
     },
     'required': <Object?>[
-      'id',
-      'component',
       'dateText',
       'locationName',
       'tithi',
@@ -1366,18 +1352,11 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       'sunsetText',
       'rahuKalam',
     ],
-    'additionalProperties': false,
   },
   'WeatherStrip': <String, Object?>{
     'type': 'object',
     'description': 'Current conditions + multi-day forecast for one location.',
     'properties': <String, Object?>{
-      'id': <String, Object?>{
-        'type': 'string',
-      },
-      'component': <String, Object?>{
-        'const': 'WeatherStrip',
-      },
       'locationName': <String, Object?>{
         'oneOf': <Object?>[
           <String, Object?>{
@@ -1780,24 +1759,15 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       },
     },
     'required': <Object?>[
-      'id',
-      'component',
       'locationName',
       'current',
       'days',
     ],
-    'additionalProperties': false,
   },
   'AqiMeter': <String, Object?>{
     'type': 'object',
     'description': 'AQI gauge (CPCB scale) with health advice.',
     'properties': <String, Object?>{
-      'id': <String, Object?>{
-        'type': 'string',
-      },
-      'component': <String, Object?>{
-        'const': 'AqiMeter',
-      },
       'locationName': <String, Object?>{
         'oneOf': <Object?>[
           <String, Object?>{
@@ -1970,8 +1940,6 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       },
     },
     'required': <Object?>[
-      'id',
-      'component',
       'locationName',
       'aqi',
       'category',
@@ -1979,6 +1947,5 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       'updatedAtText',
       'healthAdviceText',
     ],
-    'additionalProperties': false,
   },
 };

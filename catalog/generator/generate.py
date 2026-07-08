@@ -253,9 +253,22 @@ def dart_literal(value, indent: int = 0) -> str:
     return repr(value)
 
 
+def _dart_component_schema(schema: dict) -> dict:
+    """genui's CatalogItem injects the `component` discriminator itself and
+    tracks `id` at the Component level, so the Dart dataSchema must carry
+    only the component-specific props."""
+    out = dict(schema)
+    out["properties"] = {
+        k: v for k, v in schema["properties"].items() if k not in ("id", "component")
+    }
+    out["required"] = [r for r in schema.get("required", []) if r not in ("id", "component")]
+    out.pop("additionalProperties", None)
+    return out
+
+
 def build_dart(src: dict, catalog: dict) -> str:
     custom = {
-        name: schema
+        name: _dart_component_schema(schema)
         for name, schema in catalog["components"].items()
         if not src["components"][name].get("adopted")
     }

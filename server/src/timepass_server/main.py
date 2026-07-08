@@ -18,6 +18,7 @@ import uuid
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -30,6 +31,14 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("timepass")
 
 app = FastAPI(title="TimePass Orchestrator", version="0.1.0")
+
+# Dev-only: Flutter web runs on a random localhost port. Lock down before beta.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 class QueryRequest(BaseModel):

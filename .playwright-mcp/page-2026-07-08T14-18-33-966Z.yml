@@ -1,0 +1,12 @@
+- generic [ref=f1e4] [cursor=pointer]:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - menu "Popup menu":
+            - generic:
+              - group:
+                - menuitem "EN" [active] [ref=f1e11]
+                - menuitem "हिं" [ref=f1e12]
+                - menuitem "తె" [ref=f1e13]
+        - button "Dismiss" [ref=f1e14]

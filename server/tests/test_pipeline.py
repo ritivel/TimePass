@@ -73,7 +73,8 @@ async def test_scripted_queries(client, query, lang, expected_component):
     # then a valid A2UI sequence
     kinds = [next(k for k in m if k != "version") for m in messages[1:]]
     assert kinds == ["createSurface", "updateDataModel", "updateComponents"]
-    assert all(m["version"] == "v0.9.1" for m in messages[1:])
+    # v0.9 on the wire (v0.9.1 is a patch of the v0.9 family; genui pins "v0.9")
+    assert all(m["version"] == "v0.9" for m in messages[1:])
 
     surface_id = messages[1]["createSurface"]["surfaceId"]
     assert all(list(m.values())[1]["surfaceId"] == surface_id for m in messages[1:])

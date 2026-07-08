@@ -54,7 +54,8 @@ components:
   Markdown:
     layer: primitive
     m0: true
-    adopted: true
+    # Not in genui's Basic Catalog (its Text renders markdown) — we ship our own.
+    adopted: false
     description: >
       Prose answers (letters, explanations, drafts). GFM subset: bold, italic,
       lists, tables, links. No raw HTML, no images.

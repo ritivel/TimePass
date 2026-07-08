@@ -11,7 +11,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-PROTOCOL_VERSION = "v0.9.1"
+# v0.9.1 is a patch release of the v0.9 protocol family; the wire `version`
+# field stays "v0.9" — genui 0.9.2's parser rejects anything else.
+PROTOCOL_VERSION = "v0.9"
 
 
 def create_surface(surface_id: str, catalog_id: str) -> dict[str, Any]:
