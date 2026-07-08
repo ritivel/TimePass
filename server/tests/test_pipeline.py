@@ -272,6 +272,93 @@ def test_llm_output_normalization():
     assert cmp_table["rows"][0]["cells"] == ["₹100", "₹200"]
 
 
+def test_freshness_gate():
+    from timepass_server.llm import needs_freshness
+
+    assert needs_freshness("what is the current repo rate in india")
+    assert needs_freshness("petrol price today")
+    assert needs_freshness("आज की खबर")
+    assert needs_freshness("బంగారం ధర ఎంత")
+    assert not needs_freshness("explain compound interest simply")
+    assert not needs_freshness("write a leave letter to my manager")
+    assert not needs_freshness("mutual funds vs FD which is better")
+
+
+def test_parser_strips_markdown_fences():
+    from timepass_server.llm import _parse_and_validate
+
+    raw = '```json\n{"caption": "Hi.", "components": [{"id": "root", "component": "Column", "children": ["a"]}, {"id": "a", "component": "Markdown", "text": "hello"}]}\n```'
+    caption, components, _ = _parse_and_validate(raw)
+    assert caption == "Hi."
+    assert len(components) == 2
+
+
+def test_attach_sources_inserts_before_chips():
+    from timepass_server.llm import _attach_sources
+    from timepass_server.llm.base import Source
+
+    components = [
+        {"id": "root", "component": "Column", "children": ["answer", "chips"]},
+        {"id": "answer", "component": "Markdown", "text": "x"},
+        {"id": "chips", "component": "FollowUpChips",
+         "suggestions": [{"label": "a", "query": "b"}, {"label": "c", "query": "d"}]},
+    ]
+    out = _attach_sources(components, [Source(title="NDTV", url="https://x", domain="ndtv.com")])
+    root = next(c for c in out if c["id"] == "root")
+    assert root["children"] == ["answer", "web_sources", "chips"]
+    validate_surface(out)
+
+
+async def test_history_accepted(client):
+    resp = await client.post("/v1/query", json={
+        "query": "what about for short term",
+        "lang": "en",
+        "history": [
+            {"role": "user", "text": "mutual funds vs FD"},
+            {"role": "assistant", "text": "Here's a comparison of mutual funds and FDs."},
+        ],
+    })
+    assert resp.status_code == 200
+
+
+# ── live refresh ───────────────────────────────────────────────────────────
+
+async def test_cricket_marks_surface_live_and_streams_refreshes(client, monkeypatch):
+    from timepass_server import main as main_module
+
+    monkeypatch.setattr(main_module, "LIVE_REFRESH_SECONDS", 0.01)
+    # Short TTL so the server-side generator ends promptly — under the ASGI
+    # test transport a client disconnect does not cancel it, and teardown
+    # would otherwise wait out the full 300s TTL.
+    monkeypatch.setattr(main_module, "LIVE_TTL_SECONDS", 1)
+
+    resp = await client.post(
+        "/v1/query", json={"query": "ind vs aus score", "lang": "en", "surfaceId": "live_t1"}
+    )
+    messages = parse_ndjson(resp.text)
+    ext = next(m["timepass"] for m in messages if "timepass" in m)
+    assert ext.get("live") is True
+
+    # subscribe and read two refreshes
+    got = []
+    async with client.stream("GET", "/v1/live/live_t1") as live_resp:
+        assert live_resp.status_code == 200
+        async for line in live_resp.aiter_lines():
+            if line.strip():
+                got.append(json.loads(line))
+            if len(got) >= 2:
+                break
+    assert all("updateDataModel" in m for m in got)
+    first = got[0]["updateDataModel"]["value"]["cricket"]
+    second = got[1]["updateDataModel"]["value"]["cricket"]
+    assert first["teams"][0]["scoreText"] != second["teams"][0]["scoreText"]  # fixture advances
+
+
+async def test_live_unknown_surface_404(client):
+    resp = await client.get("/v1/live/nope")
+    assert resp.status_code == 404
+
+
 def test_normalizer_prunes_hallucinated_props():
     from timepass_server.llm import _parse_and_validate
 

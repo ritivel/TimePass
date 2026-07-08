@@ -109,6 +109,9 @@ void main() {
     expect(find.text('Market-linked'), findsOneWidget);
     expect(find.text('Returns are indicative.'), findsOneWidget);
     expect(find.byType(CheckboxListTile), findsNWidgets(3));
+    // SourceChips renders one chip per source, labeled by domain
+    expect(find.text('groww.in'), findsOneWidget);
+    expect(find.text('rbi.org.in'), findsOneWidget);
 
     final toggles = <Map<String, Object?>>[];
     final sub = controller.onSubmit.listen((message) {

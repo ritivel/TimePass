@@ -735,6 +735,108 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       'items',
     ],
   },
+  'SourceChips': <String, Object?>{
+    'type': 'object',
+    'description': 'Attribution chips for web sources that informed the answer. The SERVER appends this from search-grounding metadata — the model must never fabricate one.',
+    'properties': <String, Object?>{
+      'sources': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'array',
+            'items': <String, Object?>{
+              'type': 'object',
+              'properties': <String, Object?>{
+                'title': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'string',
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                },
+                'domain': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'string',
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                },
+                'url': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'string',
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                },
+              },
+              'additionalProperties': false,
+              'required': <Object?>[
+                'title',
+                'domain',
+                'url',
+              ],
+            },
+            'minItems': 1,
+            'maxItems': 5,
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+      },
+    },
+    'required': <Object?>[
+      'sources',
+    ],
+  },
   'CricketLiveScore': <String, Object?>{
     'type': 'object',
     'description': 'Live match card. Data arrives via the surface data model (adapter-fed, auto-refreshing); props are normally {path} bindings. Requires a legal Notice on the surface disclosing lagSeconds.',

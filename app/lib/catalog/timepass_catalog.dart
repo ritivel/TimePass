@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:genui/genui.dart';
 import 'package:json_schema_builder/json_schema_builder.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'schemas.g.dart';
 
@@ -21,6 +22,7 @@ List<CatalogItem> timepassCatalogItems() => [
       _comparisonTable,
       _checklist,
       _notice,
+      _sourceChips,
       _followUpChips,
       _cricketLiveScore,
       _panchangCard,
@@ -408,6 +410,46 @@ final _notice = CatalogItem(
             ),
           ],
         ),
+      );
+    },
+  ),
+);
+
+// ── SourceChips ────────────────────────────────────────────────────────────
+
+final _sourceChips = CatalogItem(
+  name: 'SourceChips',
+  dataSchema: _schemaFor('SourceChips'),
+  widgetBuilder: (itemContext) => _ResolvedProps(
+    itemContext: itemContext,
+    builder: (context, props) {
+      final sources = _mapList(props['sources']);
+      final theme = Theme.of(context).textTheme;
+      return Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        children: [
+          for (final s in sources)
+            ActionChip(
+              avatar: const Icon(Icons.public, size: 14),
+              label: Text(_str(s['domain']), style: theme.labelSmall),
+              tooltip: _str(s['title']),
+              visualDensity: VisualDensity.compact,
+              onPressed: () {
+                itemContext.dispatchEvent(
+                  UserActionEvent(
+                    name: 'source_opened',
+                    sourceComponentId: itemContext.id,
+                    context: {'url': _str(s['url'])},
+                  ),
+                );
+                final uri = Uri.tryParse(_str(s['url']));
+                if (uri != null) {
+                  launchUrl(uri, mode: LaunchMode.externalApplication);
+                }
+              },
+            ),
+        ],
       );
     },
   ),

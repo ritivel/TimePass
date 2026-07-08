@@ -41,13 +41,19 @@ def update_components(surface_id: str, components: list[dict[str, Any]]) -> dict
     }
 
 
-def caption_message(surface_id: str, caption: str, lang: str) -> dict[str, Any]:
+def caption_message(
+    surface_id: str, caption: str, lang: str, *, live: bool = False
+) -> dict[str, Any]:
     """TimePass extension line (not part of A2UI): the one-line TTS caption.
 
     The Flutter client reads this for the caption bar / TTS and must not feed
-    it to the A2UI transport adapter.
+    it to the A2UI transport adapter. `live: true` tells the client to
+    subscribe to GET /v1/live/{surfaceId} for data-model refreshes.
     """
-    return {"timepass": {"surfaceId": surface_id, "caption": caption, "lang": lang}}
+    ext: dict[str, Any] = {"surfaceId": surface_id, "caption": caption, "lang": lang}
+    if live:
+        ext["live"] = True
+    return {"timepass": ext}
 
 
 def ndjson(*messages: dict[str, Any]) -> str:

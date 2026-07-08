@@ -20,6 +20,16 @@ String defaultBaseUrl() {
   );
 }
 
+class QueryResult {
+  QueryResult({required this.caption, required this.live});
+
+  /// The one-line TTS caption (empty if the server sent none).
+  final String caption;
+
+  /// Whether the surface supports live refresh via [liveMessages].
+  final bool live;
+}
+
 class OrchestratorClient {
   OrchestratorClient({String? baseUrl, http.Client? httpClient})
       : _baseUrl = baseUrl ?? defaultBaseUrl(),
@@ -29,19 +39,28 @@ class OrchestratorClient {
   final http.Client _http;
 
   /// Sends [query] and feeds resulting A2UI messages to [onMessage].
-  /// [onCaption] fires as soon as the caption line arrives in the stream
-  /// (for the generic tier that's well before the final surface).
-  /// Returns the TTS caption (empty if the server sent none).
-  Future<String> send({
+  ///
+  /// [history] carries recent conversation turns for follow-up context.
+  /// [onCaption] fires as soon as the caption line arrives in the stream.
+  /// [onLine] receives every raw NDJSON line (used to persist and replay
+  /// surfaces across app restarts).
+  Future<QueryResult> send({
     required String query,
     required String lang,
     required String surfaceId,
     required void Function(A2uiMessage message) onMessage,
+    List<Map<String, String>> history = const [],
     void Function(String caption)? onCaption,
+    void Function(String line)? onLine,
   }) async {
     final request = http.Request('POST', Uri.parse('$_baseUrl/v1/query'))
       ..headers['content-type'] = 'application/json'
-      ..body = jsonEncode({'query': query, 'lang': lang, 'surfaceId': surfaceId});
+      ..body = jsonEncode({
+        'query': query,
+        'lang': lang,
+        'surfaceId': surfaceId,
+        'history': history,
+      });
 
     final response = await _http.send(request);
     if (response.statusCode != 200) {
@@ -53,21 +72,39 @@ class OrchestratorClient {
     }
 
     var caption = '';
+    var live = false;
     final lines = response.stream
         .transform(utf8.decoder)
         .transform(const LineSplitter());
     await for (final line in lines) {
       if (line.trim().isEmpty) continue;
+      onLine?.call(line);
       final decoded = jsonDecode(line) as Map<String, Object?>;
       if (decoded.containsKey('timepass')) {
         final ext = decoded['timepass'] as Map<String, Object?>;
         caption = (ext['caption'] as String?) ?? '';
+        live = ext['live'] == true;
         if (caption.isNotEmpty) onCaption?.call(caption);
         continue;
       }
       onMessage(A2uiMessage.fromJson(decoded));
     }
-    return caption;
+    return QueryResult(caption: caption, live: live);
+  }
+
+  /// Subscribes to live data-model refreshes for [surfaceId]. The stream
+  /// closes when the server-side TTL expires. Cancel to unsubscribe.
+  Stream<A2uiMessage> liveMessages(String surfaceId) async* {
+    final request = http.Request('GET', Uri.parse('$_baseUrl/v1/live/$surfaceId'));
+    final response = await _http.send(request);
+    if (response.statusCode != 200) return; // expired or unknown — not an error
+    final lines = response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+    await for (final line in lines) {
+      if (line.trim().isEmpty) continue;
+      yield A2uiMessage.fromJson(jsonDecode(line) as Map<String, Object?>);
+    }
   }
 
   void dispose() => _http.close();

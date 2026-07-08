@@ -261,6 +261,27 @@ components:
     events:
       checklist_toggled: {itemId: string, checked: boolean}
 
+  SourceChips:
+    layer: generic
+    m0: false
+    description: >
+      Attribution chips for web sources that informed the answer. The SERVER
+      appends this from search-grounding metadata — the model must never
+      fabricate one.
+    props:
+      sources:
+        type: array
+        required: true
+        minItems: 1
+        maxItems: 5
+        items:
+          fields:
+            title: {type: string, required: true}
+            domain: {type: string, required: true}
+            url: {type: string, required: true}
+    events:
+      source_opened: {url: string}
+
   # ── Layer 2: hero components (M0 subset) ────────────────────────────────
 
   CricketLiveScore:
@@ -417,9 +438,9 @@ components:
 # adding one = define here + implement CatalogItem + design pass):
 reserved:
   - MediaCarousel
+  # (SourceChips promoted 2026-07-08 — server-appended from grounding metadata)
   - MapCard
   - ChartCard
-  - SourceChips
   - CricketMatchSummary
   - TrainStatusTimeline
   - PnrStatusCard
