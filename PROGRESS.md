@@ -33,7 +33,7 @@ Grounding-gate history (same 30-query set): always-ground → 26/30 valid, capti
 
 | Integration | Status | Notes |
 |---|---|---|
-| Gemini (generic tier) | ✅ live | `gemini-2.5-flash-lite`; key in SSM `/shared/gemini-api-key` (**rotate at some point** — passed through chat once). Free tier throws 503s under load; paid tier likely needed at launch. |
+| Gemini (generic tier) | ✅ live, **paid tier** | `gemini-2.5-flash-lite`; key in SSM `/shared/gemini-api-key` (**rotate at some point** — passed through chat). Paid tier verified 2026-07-08: zero 429s at 10-parallel burst. Note: `503 UNAVAILABLE` ("high demand") is Google-side *capacity*, not rate limiting — no tier eliminates it; eval scores swing ±10% run-to-run with it. Mitigation candidate: retry-on-503 via `gemini-2.5-flash` (separate capacity pool, failures-only cost). |
 | CPCB AQI (data.gov.in) | ✅ live | Key in SSM `/shared/datagovin-api-key`. All-India stations, per-city rollup (mean of station AQIs, dominant pollutant), 10-min cache, fixture fallback. |
 | IMD weather | ⏳ pending | Profile submitted on api.imd.gov.in as Private/Profit "ritivel" — awaiting IMD approval. Adapter still fixture. |
 | Cricket feed | ☐ decision | EntitySport (~$150/mo) vs Roanuz — commercial call, fixtures until then. |
@@ -55,17 +55,34 @@ Grounding-gate history (same 30-query set): always-ground → 26/30 valid, capti
 - **Prompt instructions cannot discipline tool use on Flash-Lite**: with `google_search` available it searched 70–77% of queries no matter what the system prompt said. Gate server-side.
 - Grounding costs money at scale (1,500 free grounded prompts/day, then ~$14/1k) — another reason the freshness gate is server-owned.
 
-## Next steps (priority order)
+## Roadmap
 
-1. **Rebuild the phone app** — the installed build predates SourceChips, live refresh, history, persistence, ComparisonTable/Checklist, and the streaming client.
-2. **IMD weather adapter** when approval lands (adapter seam + fallback pattern already proven with AQI). **Panchang** needs a Prokerala signup (user).
-3. **Cricket feed decision** (EntitySport trial recommended) — the live-refresh pipeline is built and waiting; the real feed replaces `_snapshots()` in the adapter.
-4. **Freshness gate refinement** — known miss: "jio vs airtel plans under 300" (current prices, no freshness keyword). Consider a tiny classifier or letting the model request a search via a declared function.
-5. **M1**: Sarvam voice in + TTS caption (needs Sarvam key — self-serve); real intent router; then the **design pass** on the catalog (layer 3 of the agreed plan).
-6. **Launch-economics items**: paid Gemini tier (503s), selective grounding budget, grounded-query latency (~15–18s — consider showing the grounded plain-text answer as Markdown immediately, then upgrading the surface).
+### Near term (unblocks M0 completion)
+
+1. ~~Rebuild the phone app~~ — done 2026-07-08: release APK built against the laptop's LAN IP (`--dart-define=TIMEPASS_API=http://192.168.1.2:8000`, server on `--host 0.0.0.0`), so the app runs standalone over Wi-Fi with no adb bridge.
+2. **Real adapters for the remaining hero fixtures**:
+   - *Weather* — blocked on IMD approval (profile submitted); seam + fallback pattern proven with AQI.
+   - *Panchang* — needs a Prokerala signup (user, free tier); then per-city/day caching makes it ~₹0.
+   - *Cricket* — commercial decision (EntitySport trial ~$150/mo recommended); the live-refresh pipeline is built and waiting — the real feed replaces `_snapshots()` in the adapter.
+3. **Freshness-gate refinement** — known miss: "jio vs airtel plans under 300" (current prices, no freshness keyword). Options: tiny intent classifier, or declare search as a function the model can *request* (server executes → keeps the gate server-owned).
+4. **503 resilience** — retry-on-503 via `gemini-2.5-flash` as a same-provider fallback (separate capacity pool); OpenAI/Anthropic slots exist behind the provider interface when keys arrive.
+
+### M1 (private beta, spec §9)
+
+- **Voice in + spoken caption** — Sarvam Saarika ASR (₹0.05/query) + Bulbul TTS for the caption line (already streams first). Sarvam signup is self-serve (user).
+- **Real intent router** — replace the keyword stub (language-ID → normalize → intent; the seam is `router.py`, one function).
+- **Trains via deep-links** (DeepLinkCard is spec'd; no API needed pre-TIES), movies/OTT + recipes categories.
+- **Basic analytics** — the typed event stream (follow_up_selected, source_opened, …) is designed for this; wire to a sink.
+- **100-user beta** — needs: hosted server (currently laptop), crash reporting, grounded-query UX (show grounded text as Markdown immediately, upgrade to composed surface — hides the 15s two-phase latency).
+
+### M2 (monetization + launch prep)
+
+- Action components (UpiPayButton, AffiliateCta, ConsultReferralCard, DeepLinkCard, AdSlot) — contracts frozen in COMPONENT_CATALOG.md §7.4; validator rules R5/R6 already enforce disclosure/placement.
+- **The design pass** — layer 3 of the original plan: one polished implementation per catalog component; every answer inherits it.
+- Paper track (start now, they're slow): DPIIT recognition → TIES filing; TMDB commercial agreement; cricket legal opinion.
 
 ## Milestone tracker (spec §9)
 
-- **M0 (weeks 1–3)**: app + renderer + 8 components ✅ · hi/en/te input ✅ · te output ✅ · <4s answers ✅ hero / ⚠ generic (p50 5.1s) · "real APIs" ⚠ 1 of 3 (AQI live; cricket+panchang+weather fixtures)
+- **M0 (weeks 1–3)**: app + renderer + 8 components ✅ · hi/en/te input ✅ · te output ✅ · <4s answers ✅ hero + ✅ generic ungrounded (p50 5s) / ⚠ grounded (~15s) · "real APIs" ⚠ 1 of 3 (AQI live; cricket+panchang+weather fixtures) · **beyond-M0 extras shipped**: search grounding + sources, multi-turn context, live surfaces, provider abstraction, conversation persistence
 - **M1 (weeks 4–8)**: not started — voice, 6 hero categories, 100-user beta
 - **M2 (weeks 9–14)**: not started — monetization components, TIES filing, legal opinions
