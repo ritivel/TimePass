@@ -52,3 +52,42 @@ def caption_message(surface_id: str, caption: str, lang: str) -> dict[str, Any]:
 
 def ndjson(*messages: dict[str, Any]) -> str:
     return "".join(json.dumps(m, ensure_ascii=False, separators=(",", ":")) + "\n" for m in messages)
+
+
+def flatten_components(components: list[Any]) -> list[dict[str, Any]]:
+    """Normalizes LLM output to the flat adjacency-list form.
+
+    Models frequently nest component objects inside `children`/`child`
+    despite instructions. That's deterministic to repair: hoist nested
+    components to the top-level list and replace them with their ids
+    (synthesizing ids where missing). Validation still runs afterwards —
+    this fixes shape, never content.
+    """
+    out: list[dict[str, Any]] = []
+    counter = 0
+
+    def ensure_id(comp: dict[str, Any]) -> str:
+        nonlocal counter
+        if not comp.get("id"):
+            counter += 1
+            comp["id"] = f"c{counter}"
+        return comp["id"]
+
+    def walk(comp: dict[str, Any]) -> str:
+        comp = dict(comp)
+        children = comp.get("children")
+        if isinstance(children, list):
+            comp["children"] = [
+                walk(item) if isinstance(item, dict) and "component" in item else item
+                for item in children
+            ]
+        child = comp.get("child")
+        if isinstance(child, dict) and "component" in child:
+            comp["child"] = walk(child)
+        out.append(comp)
+        return ensure_id(comp)
+
+    for comp in components:
+        if isinstance(comp, dict):
+            walk(comp)
+    return out

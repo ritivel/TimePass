@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 from typing import Any
 
+from .a2ui import flatten_components
 from .validator import SurfaceValidationError, validate_surface
 
 log = logging.getLogger(__name__)
@@ -76,10 +77,11 @@ async def generate_generic(query: str, lang: str) -> tuple[str, list[dict[str, A
         + f"\nOutput language: {_LANG_NAME[lang]}.\n"
         + _OUTPUT_CONTRACT
     )
-    try:
+
+    async def attempt(contents) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
         response = await client.aio.models.generate_content(
             model=MODEL,
-            contents=query,
+            contents=contents,
             config={
                 "system_instruction": system,
                 "response_mime_type": "application/json",
@@ -88,12 +90,27 @@ async def generate_generic(query: str, lang: str) -> tuple[str, list[dict[str, A
         )
         payload = json.loads(response.text)
         caption = str(payload["caption"])
-        components = payload["components"]
+        components = flatten_components(payload["components"])
         data_model = payload.get("dataModel") or {}
         validate_surface(components)
         return caption, components, data_model
+
+    try:
+        try:
+            return await attempt(query)
+        except SurfaceValidationError as first:
+            # Standard genUI repair loop: one retry with the validation
+            # errors as feedback. Failures only, so the marginal cost is
+            # one extra call on a small fraction of queries.
+            log.info("generic tier invalid, retrying with feedback: %s", first.errors[:3])
+            feedback = (
+                f"{query}\n\n[system] Your previous response failed catalog "
+                f"validation with these errors:\n- " + "\n- ".join(first.errors[:10]) +
+                "\nRespond again with a corrected JSON object that satisfies the catalog."
+            )
+            return await attempt(feedback)
     except SurfaceValidationError as e:
-        log.warning("generic tier produced invalid surface, degrading: %s", e.errors[:5])
+        log.warning("generic tier invalid after retry, degrading: %s", e.errors[:5])
     except Exception:
         log.exception("generic tier failed, degrading to text surface")
     # degrade: answer as plain text via a second, schema-free call is a later

@@ -25,10 +25,10 @@ _KEYWORDS: dict[Category, list[str]] = {
         "aqi", "air quality", "pollution", "smog",
         "प्रदूषण", "वायु गुणवत्ता", "కాలుష్యం", "గాలి నాణ్యత",
     ],
+    # NOTE: no bare " vs " — it hijacks generic comparisons ("mutual funds vs FD")
     Category.CRICKET: [
-        "cricket", "score", "match", "ipl", "t20", "odi", "wicket", " vs ",
-        "क्रिकेट", "स्कोर", "मैच", "क्రికెట్", "స్కోరు", "మ్యాచ్",
-        "క్రికెట్",
+        "cricket", "score", "match", "ipl", "t20", "odi", "wicket",
+        "क्रिकेट", "स्कोर", "मैच", "క్రికెట్", "స్కోరు", "మ్యాచ్",
     ],
     Category.PANCHANG: [
         "panchang", "tithi", "muhurat", "muhurtham", "rahu", "nakshatra", "ekadashi", "purnima", "amavasya",

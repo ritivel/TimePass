@@ -37,6 +37,8 @@ def parse_ndjson(text: str) -> list[dict]:
         ("delhi air quality", Category.AQI),
         ("హైదరాబాద్ వాతావరణం", Category.WEATHER),
         ("write a leave letter to my manager", Category.GENERIC),
+        # regression: " vs " must not hijack generic comparisons
+        ("mutual funds vs FD which is better", Category.GENERIC),
     ],
 )
 def test_routing(query: str, category: Category):
@@ -161,3 +163,32 @@ def test_rejects_dangling_child_ref():
 def test_rejects_missing_root():
     with pytest.raises(SurfaceValidationError, match="root"):
         validate_surface([{"id": "a", "component": "Divider"}])
+
+
+# ── LLM output normalization ───────────────────────────────────────────────
+
+def test_flatten_nested_llm_output():
+    from timepass_server.a2ui import flatten_components
+
+    nested = [
+        {
+            "id": "root",
+            "component": "Column",
+            "children": [
+                {"id": "title", "component": "Text", "variant": "h2", "text": "Hi"},
+                {"component": "Markdown", "text": "body"},  # no id → synthesized
+                "chips",  # already a ref
+            ],
+        },
+        {
+            "id": "chips",
+            "component": "FollowUpChips",
+            "suggestions": [{"label": "a", "query": "b"}, {"label": "c", "query": "d"}],
+        },
+    ]
+    flat = flatten_components(nested)
+    root = next(c for c in flat if c["id"] == "root")
+    assert root["children"][0] == "title"
+    assert root["children"][2] == "chips"
+    assert all(isinstance(ref, str) for ref in root["children"])
+    validate_surface(flat)  # normalized output must be catalog-valid
