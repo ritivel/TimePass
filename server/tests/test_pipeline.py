@@ -67,22 +67,30 @@ async def test_scripted_queries(client, query, lang, expected_component):
     assert resp.status_code == 200
     messages = parse_ndjson(resp.text)
 
-    # line 1: caption extension line with a non-empty caption
-    assert "timepass" in messages[0]
-    assert messages[0]["timepass"]["caption"]
-    assert messages[0]["timepass"]["lang"] == lang
+    # exactly one caption extension line, non-empty, right language
+    captions = [m["timepass"] for m in messages if "timepass" in m]
+    assert len(captions) == 1
+    assert captions[0]["caption"]
+    assert captions[0]["lang"] == lang
 
-    # then a valid A2UI sequence
-    kinds = [next(k for k in m if k != "version") for m in messages[1:]]
-    assert kinds == ["createSurface", "updateDataModel", "updateComponents"]
+    # A2UI sequence: starts with createSurface, ends with updateComponents
+    # (the generic tier streams a placeholder surface in between).
+    a2ui_msgs = [m for m in messages if "timepass" not in m]
+    kinds = [next(k for k in m if k != "version") for m in a2ui_msgs]
+    assert kinds[0] == "createSurface"
+    assert kinds[-1] == "updateComponents"
     # v0.9 on the wire (v0.9.1 is a patch of the v0.9 family; genui pins "v0.9")
-    assert all(m["version"] == "v0.9" for m in messages[1:])
+    assert all(m["version"] == "v0.9" for m in a2ui_msgs)
 
-    surface_id = messages[1]["createSurface"]["surfaceId"]
-    assert all(list(m.values())[1]["surfaceId"] == surface_id for m in messages[1:])
+    surface_id = a2ui_msgs[0]["createSurface"]["surfaceId"]
+    assert all(list(m.values())[1]["surfaceId"] == surface_id for m in a2ui_msgs)
 
-    components = messages[3]["updateComponents"]["components"]
-    validate_surface(components)  # must not raise
+    # every updateComponents on the wire must be catalog-valid (fail closed)
+    for m in a2ui_msgs:
+        if "updateComponents" in m:
+            validate_surface(m["updateComponents"]["components"])
+
+    components = a2ui_msgs[-1]["updateComponents"]["components"]
     types = {c["component"] for c in components}
     assert expected_component in types
 
@@ -192,3 +200,53 @@ def test_flatten_nested_llm_output():
     assert root["children"][2] == "chips"
     assert all(isinstance(ref, str) for ref in root["children"])
     validate_surface(flat)  # normalized output must be catalog-valid
+
+
+def test_llm_output_normalization():
+    from timepass_server.llm import _parse_and_validate
+
+    # keyed cells (LLM shape mistake) + trailing garbage after the JSON object
+    raw = json.dumps({
+        "caption": "Comparison ready.",
+        "components": [
+            {"id": "root", "component": "Column", "children": ["cmp"]},
+            {
+                "id": "cmp",
+                "component": "ComparisonTable",
+                "columns": [{"key": "a", "label": "A"}, {"key": "b", "label": "B"}],
+                "rows": [
+                    {"label": "Price", "cells": [
+                        {"key": "b", "value": "₹200"}, {"key": "a", "value": "₹100"},
+                    ]},
+                ],
+            },
+        ],
+        "dataModel": {},
+    }) + "\ntrailing junk"
+    caption, components, _ = _parse_and_validate(raw)
+    assert caption == "Comparison ready."
+    cmp_table = next(c for c in components if c["component"] == "ComparisonTable")
+    # keyed cells re-ordered to match column order
+    assert cmp_table["rows"][0]["cells"] == ["₹100", "₹200"]
+
+
+def test_normalizer_prunes_hallucinated_props():
+    from timepass_server.llm import _parse_and_validate
+
+    raw = json.dumps({
+        "caption": "Done.",
+        "components": [
+            {"id": "root", "component": "Column", "children": ["chips"]},
+            {
+                "id": "chips",
+                "component": "FollowUpChips",
+                "event": {"name": "made_up"},  # hallucinated — must be pruned
+                "suggestions": [
+                    {"label": "a", "query": "b"}, {"label": "c", "query": "d"},
+                ],
+            },
+        ],
+    })
+    _, components, _ = _parse_and_validate(raw)  # must not raise
+    chips = next(c for c in components if c["component"] == "FollowUpChips")
+    assert "event" not in chips

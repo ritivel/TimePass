@@ -115,16 +115,15 @@ class _AnswerScreenState extends State<AnswerScreen> {
       }
     });
     try {
-      final caption = await _client.send(
+      await _client.send(
         query: trimmed,
         lang: _lang,
         surfaceId: answer.surfaceId,
         onMessage: _controller.handleMessage,
+        // Caption streams in before the final surface on generic answers.
+        onCaption: (caption) => setState(() => answer.caption = caption),
       );
-      setState(() {
-        answer.caption = caption;
-        answer.loading = false;
-      });
+      setState(() => answer.loading = false);
       // TODO(M1): speak the caption via Sarvam Bulbul TTS.
     } catch (e) {
       setState(() {

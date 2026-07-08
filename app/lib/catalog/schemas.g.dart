@@ -385,6 +385,356 @@ const Map<String, Map<String, Object?>> componentSchemas = {
       'suggestions',
     ],
   },
+  'ComparisonTable': <String, Object?>{
+    'type': 'object',
+    'description': 'N-way comparison (e.g. mutual funds vs FD). Use this instead of KeyValueGrid whenever comparing 2+ options across criteria.',
+    'properties': <String, Object?>{
+      'title': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'string',
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+      },
+      'columns': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'array',
+            'items': <String, Object?>{
+              'type': 'object',
+              'properties': <String, Object?>{
+                'key': <String, Object?>{
+                  'type': 'string',
+                },
+                'label': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'string',
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                },
+              },
+              'additionalProperties': false,
+              'required': <Object?>[
+                'key',
+                'label',
+              ],
+            },
+            'minItems': 2,
+            'maxItems': 4,
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+      },
+      'rows': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'array',
+            'items': <String, Object?>{
+              'type': 'object',
+              'properties': <String, Object?>{
+                'label': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'string',
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                  'description': 'Criterion name (e.g. "Risk").',
+                },
+                'cells': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'array',
+                      'items': <String, Object?>{
+                        'oneOf': <Object?>[
+                          <String, Object?>{
+                            'type': 'string',
+                          },
+                          <String, Object?>{
+                            'type': 'object',
+                            'properties': <String, Object?>{
+                              'path': <String, Object?>{
+                                'type': 'string',
+                                'pattern': '^/',
+                              },
+                            },
+                            'required': <Object?>[
+                              'path',
+                            ],
+                            'additionalProperties': false,
+                          },
+                        ],
+                      },
+                      'description': 'One cell per column',
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                },
+              },
+              'additionalProperties': false,
+              'required': <Object?>[
+                'label',
+                'cells',
+              ],
+            },
+            'minItems': 1,
+            'maxItems': 10,
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+      },
+      'highlightColumnKey': <String, Object?>{
+        'type': 'string',
+        'description': 'Key of the recommended column',
+      },
+      'footnote': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'string',
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+      },
+    },
+    'required': <Object?>[
+      'columns',
+      'rows',
+    ],
+  },
+  'Checklist': <String, Object?>{
+    'type': 'object',
+    'description': 'Diagnostic / to-do / packing list with optional check-off. Use for step-by-step remedies and preparation lists.',
+    'properties': <String, Object?>{
+      'title': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'string',
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+      },
+      'items': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'array',
+            'items': <String, Object?>{
+              'type': 'object',
+              'properties': <String, Object?>{
+                'id': <String, Object?>{
+                  'type': 'string',
+                },
+                'text': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'string',
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                },
+                'detail': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'string',
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                },
+                'checked': <String, Object?>{
+                  'oneOf': <Object?>[
+                    <String, Object?>{
+                      'type': 'boolean',
+                      'default': false,
+                    },
+                    <String, Object?>{
+                      'type': 'object',
+                      'properties': <String, Object?>{
+                        'path': <String, Object?>{
+                          'type': 'string',
+                          'pattern': '^/',
+                        },
+                      },
+                      'required': <Object?>[
+                        'path',
+                      ],
+                      'additionalProperties': false,
+                    },
+                  ],
+                },
+              },
+              'additionalProperties': false,
+              'required': <Object?>[
+                'id',
+                'text',
+              ],
+            },
+            'minItems': 1,
+            'maxItems': 24,
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+      },
+      'interactive': <String, Object?>{
+        'oneOf': <Object?>[
+          <String, Object?>{
+            'type': 'boolean',
+            'default': false,
+          },
+          <String, Object?>{
+            'type': 'object',
+            'properties': <String, Object?>{
+              'path': <String, Object?>{
+                'type': 'string',
+                'pattern': '^/',
+              },
+            },
+            'required': <Object?>[
+              'path',
+            ],
+            'additionalProperties': false,
+          },
+        ],
+        'description': 'Whether the user can toggle items.',
+      },
+    },
+    'required': <Object?>[
+      'items',
+    ],
+  },
   'CricketLiveScore': <String, Object?>{
     'type': 'object',
     'description': 'Live match card. Data arrives via the surface data model (adapter-fed, auto-refreshing); props are normally {path} bindings. Requires a legal Notice on the surface disclosing lagSeconds.',

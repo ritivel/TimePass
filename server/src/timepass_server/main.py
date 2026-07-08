@@ -1,13 +1,12 @@
 """TimePass orchestrator API.
 
-POST /v1/query {query, lang?, surfaceId?} → NDJSON stream:
-  1. {"timepass": {caption, lang, surfaceId}}     TTS caption (app-level line)
-  2. {"version": "v0.9.1", "createSurface": ...}   A2UI messages ↓
-  3. {"version": "v0.9.1", "updateDataModel": ...}
-  4. {"version": "v0.9.1", "updateComponents": ...}
+POST /v1/query {query, lang?, surfaceId?} → NDJSON stream of A2UI messages
+(createSurface / updateDataModel / updateComponents) plus one app-level
+{"timepass": {caption, lang, surfaceId}} TTS-caption line.
 
-Hero categories are template-composed and adapter-fed (deterministic, cached);
-only the generic tier calls the LLM. Every surface passes the catalog
+Hero categories are template-composed and adapter-fed (deterministic, cached,
+sent atomically). The generic tier streams progressively: placeholder surface
+→ early caption → validated final surface. Every surface passes the catalog
 validator before shipping — fail closed.
 """
 
@@ -58,6 +57,14 @@ async def query(req: QueryRequest) -> StreamingResponse:
     category = route(req.query)
     log.info("query lang=%s category=%s %r", req.lang, category.value, req.query[:80])
 
+    if category is Category.GENERIC:
+        # Progressive: placeholder surface immediately, caption as soon as it
+        # parses out of the LLM stream, validated final surface at the end.
+        return StreamingResponse(
+            llm.generate_generic_stream(req.query, req.lang, surface_id),
+            media_type="application/x-ndjson",
+        )
+
     if category is Category.CRICKET:
         data = await cricket.get_live_match(req.query, req.lang)
         caption, components, data_model = templates.cricket_surface(data, req.lang)
@@ -67,15 +74,13 @@ async def query(req: QueryRequest) -> StreamingResponse:
     elif category is Category.WEATHER:
         data = await weather.get_weather(req.query, req.lang)
         caption, components, data_model = templates.weather_surface(data, req.lang)
-    elif category is Category.AQI:
+    else:  # Category.AQI
         data = await weather.get_aqi(req.query, req.lang)
         caption, components, data_model = templates.aqi_surface(data, req.lang)
-    else:
-        caption, components, data_model = await llm.generate_generic(req.query, req.lang)
 
     # Fail closed: a hero template failing validation is a server bug, never
-    # something to ship. (Generic-tier LLM output is validated inside llm.py
-    # and degrades gracefully there.)
+    # something to ship. (Generic-tier surfaces are validated inside
+    # generate_generic_stream and degrade gracefully there.)
     try:
         validate_surface(components)
     except SurfaceValidationError as e:

@@ -1,0 +1,39 @@
+# Generic-tier eval set: diverse real-world queries across domains and
+# languages. Hero-category queries are excluded (deterministic templates).
+# Run: uv run evals/run_evals.py
+queries:
+  # comparisons (should prefer ComparisonTable)
+  - {q: "mutual funds vs FD which is better", lang: en}
+  - {q: "UPI Lite vs wallet me kya difference hai", lang: hi}
+  - {q: "petrol bike vs electric scooter for daily commute", lang: en}
+  - {q: "jio vs airtel prepaid plans under 300", lang: en}
+  - {q: "OnePlus Nord vs Redmi Note comparison", lang: en}
+  # diagnostics / how-to (should prefer Checklist)
+  - {q: "tulsi plant leaves drying what to do", lang: en}
+  - {q: "AC cooling kam kar raha hai kya check karu", lang: hi}
+  - {q: "laptop battery drain fast solutions", lang: en}
+  - {q: "monsoon me bike ki care kaise kare", lang: hi}
+  - {q: "packing list for 3 day goa trip", lang: en}
+  # prose (should prefer Markdown)
+  - {q: "write a short leave letter to my manager for tomorrow", lang: en}
+  - {q: "resignation letter draft professional", lang: en}
+  - {q: "explain compound interest simply", lang: en}
+  - {q: "SIP kya hota hai simple words me", lang: hi}
+  - {q: "బ్యాంక్ లో FD ఎలా తెరవాలి", lang: te}
+  # facts (should prefer KeyValueGrid)
+  - {q: "PAN card ke liye kya documents chahiye", lang: hi}
+  - {q: "passport renewal process and fees", lang: en}
+  - {q: "LPG cylinder subsidy kaise check kare", lang: hi}
+  - {q: "income tax slabs this year", lang: en}
+  - {q: "driving licence renewal documents", lang: en}
+  # general knowledge / long tail
+  - {q: "why is the sky blue", lang: en}
+  - {q: "home remedies for cold and cough", lang: en}
+  - {q: "సర్దుకుపోయే ఇంటి భోజనం వారానికి ప్లాన్", lang: te}
+  - {q: "best time to visit ladakh", lang: en}
+  - {q: "how to start a small kirana store", lang: en}
+  - {q: "diwali gift ideas under 500", lang: en}
+  - {q: "morning yoga routine for beginners", lang: en}
+  - {q: "difference between mutual fund and index fund", lang: en}
+  - {q: "how to improve english speaking", lang: en}
+  - {q: "साइकिल चलाने के फायदे", lang: hi}

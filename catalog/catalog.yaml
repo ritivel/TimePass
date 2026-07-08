@@ -36,7 +36,11 @@ instructions: |
      Use Latin digits. Never invent URLs; only use server-provided link fields.
   8. Prefer one coarse hero component over rebuilding it from primitives.
      For prose answers (letters, explanations) use Markdown — cards are not
-     mandatory. For labeled facts use KeyValueGrid.
+     mandatory. For labeled facts use KeyValueGrid; for comparing options use
+     ComparisonTable; for remedies/steps/preparation use Checklist.
+  9. Be compact: aim for 3-6 components total (plus FollowUpChips). One good
+     Markdown or one ComparisonTable beats six stacked sections. Long answers
+     are slower and worse — say it once, visually.
 
 components:
 
@@ -204,6 +208,59 @@ components:
     events:
       follow_up_selected: {query: string}
 
+  ComparisonTable:
+    layer: generic
+    m0: false
+    description: >
+      N-way comparison (e.g. mutual funds vs FD). Use this instead of
+      KeyValueGrid whenever comparing 2+ options across criteria.
+    props:
+      title: {type: string}
+      columns:
+        type: array
+        required: true
+        minItems: 2
+        maxItems: 4
+        items:
+          fields:
+            key: {type: string, required: true, dynamic: false}
+            label: {type: string, required: true}
+      rows:
+        type: array
+        required: true
+        minItems: 1
+        maxItems: 10
+        items:
+          fields:
+            label: {type: string, required: true, description: Criterion name (e.g. "Risk").}
+            cells: {type: array, required: true, items: {type: string}, description: One cell per column, same order as columns.}
+      highlightColumnKey: {type: string, dynamic: false, description: Key of the recommended column, if any.}
+      footnote: {type: string}
+
+  Checklist:
+    layer: generic
+    m0: false
+    description: >
+      Diagnostic / to-do / packing list with optional check-off. Use for
+      step-by-step remedies and preparation lists.
+    props:
+      title: {type: string}
+      items:
+        type: array
+        required: true
+        minItems: 1
+        # 24, not 12: real content (weekly meal plans, packing lists) runs long
+        maxItems: 24
+        items:
+          fields:
+            id: {type: string, required: true, dynamic: false}
+            text: {type: string, required: true}
+            detail: {type: string}
+            checked: {type: boolean, default: false}
+      interactive: {type: boolean, default: false, description: Whether the user can toggle items.}
+    events:
+      checklist_toggled: {itemId: string, checked: boolean}
+
   # ── Layer 2: hero components (M0 subset) ────────────────────────────────
 
   CricketLiveScore:
@@ -359,8 +416,6 @@ components:
 # Post-M0 components reserved by COMPONENT_CATALOG.md §4 (names are frozen;
 # adding one = define here + implement CatalogItem + design pass):
 reserved:
-  - ComparisonTable
-  - Checklist
   - MediaCarousel
   - MapCard
   - ChartCard

@@ -178,7 +178,7 @@ N-way comparison ("mutual funds vs FD vs gold").
 
 #### 13. `Checklist`
 Diagnostic / to-do / packing lists ("why is my tulsi dying").
-- **`items`**: `[{ id, text, detail?, checked?: bool }]` (≤12)
+- **`items`**: `[{ id, text, detail?, checked?: bool }]` (≤24 — weekly plans and packing lists run long)
 - `title?`, `interactive: bool` (default false)
 - Events: `checklist_toggled { itemId, checked }` (only when interactive)
 

@@ -18,6 +18,8 @@ import 'schemas.g.dart';
 List<CatalogItem> timepassCatalogItems() => [
       _markdown,
       _keyValueGrid,
+      _comparisonTable,
+      _checklist,
       _notice,
       _followUpChips,
       _cricketLiveScore,
@@ -190,6 +192,181 @@ final _keyValueGrid = CatalogItem(
     },
   ),
 );
+
+// ── ComparisonTable ────────────────────────────────────────────────────────
+
+final _comparisonTable = CatalogItem(
+  name: 'ComparisonTable',
+  dataSchema: _schemaFor('ComparisonTable'),
+  widgetBuilder: (itemContext) => _ResolvedProps(
+    itemContext: itemContext,
+    builder: (context, props) {
+      final theme = Theme.of(context).textTheme;
+      final title = _str(props['title']);
+      final columns = _mapList(props['columns']);
+      final rows = _mapList(props['rows']);
+      final highlightKey = _str(props['highlightColumnKey']);
+      final footnote = _str(props['footnote']);
+      final highlightIndex =
+          columns.indexWhere((c) => _str(c['key']) == highlightKey);
+      final highlightColor =
+          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4);
+
+      TableCell cell(Widget child, int columnIndex) => TableCell(
+            child: Container(
+              color: columnIndex == highlightIndex ? highlightColor : null,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: child,
+            ),
+          );
+
+      return Card(
+        margin: EdgeInsets.zero,
+        child: Padding(
+          padding: _pad,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (title.isNotEmpty) ...[
+                Text(title, style: theme.titleMedium),
+                _gap,
+              ],
+              Table(
+                columnWidths: const {0: IntrinsicColumnWidth()},
+                defaultVerticalAlignment: TableCellVerticalAlignment.top,
+                border: TableBorder(
+                  horizontalInside:
+                      BorderSide(color: Colors.grey.shade200),
+                ),
+                children: [
+                  TableRow(
+                    children: [
+                      cell(const SizedBox(), -1),
+                      for (final (i, col) in columns.indexed)
+                        cell(
+                          Text(_str(col['label']),
+                              style: theme.bodySmall
+                                  ?.copyWith(fontWeight: FontWeight.w600)),
+                          i,
+                        ),
+                    ],
+                  ),
+                  for (final row in rows)
+                    TableRow(
+                      children: [
+                        cell(
+                            Text(_str(row['label']), style: theme.bodySmall),
+                            -1),
+                        for (final (i, _) in columns.indexed)
+                          cell(
+                            Text(
+                              i < _strList(row['cells']).length
+                                  ? _strList(row['cells'])[i]
+                                  : '',
+                              style: theme.bodyMedium,
+                            ),
+                            i,
+                          ),
+                      ],
+                    ),
+                ],
+              ),
+              if (footnote.isNotEmpty) ...[
+                _gap,
+                Text(footnote, style: theme.bodySmall),
+              ],
+            ],
+          ),
+        ),
+      );
+    },
+  ),
+);
+
+// ── Checklist ──────────────────────────────────────────────────────────────
+
+final _checklist = CatalogItem(
+  name: 'Checklist',
+  dataSchema: _schemaFor('Checklist'),
+  widgetBuilder: (itemContext) => _ChecklistWidget(itemContext: itemContext),
+);
+
+class _ChecklistWidget extends StatefulWidget {
+  const _ChecklistWidget({required this.itemContext});
+
+  final CatalogItemContext itemContext;
+
+  @override
+  State<_ChecklistWidget> createState() => _ChecklistWidgetState();
+}
+
+class _ChecklistWidgetState extends State<_ChecklistWidget> {
+  final Map<String, bool> _checked = {};
+
+  @override
+  Widget build(BuildContext context) {
+    return _ResolvedProps(
+      itemContext: widget.itemContext,
+      builder: (context, props) {
+        final theme = Theme.of(context).textTheme;
+        final title = _str(props['title']);
+        final items = _mapList(props['items']);
+        final interactive = props['interactive'] == true;
+
+        return Card(
+          margin: EdgeInsets.zero,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (title.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+                    child: Text(title, style: theme.titleMedium),
+                  ),
+                for (final item in items)
+                  _row(context, item, interactive),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _row(
+      BuildContext context, Map<String, Object?> item, bool interactive) {
+    final theme = Theme.of(context).textTheme;
+    final id = _str(item['id']);
+    final checked = _checked[id] ?? (item['checked'] == true);
+    final detail = _str(item['detail']);
+
+    void toggle(bool? value) {
+      setState(() => _checked[id] = value ?? false);
+      widget.itemContext.dispatchEvent(
+        UserActionEvent(
+          name: 'checklist_toggled',
+          sourceComponentId: widget.itemContext.id,
+          context: {'itemId': id, 'checked': value ?? false},
+        ),
+      );
+    }
+
+    return CheckboxListTile(
+      value: checked,
+      onChanged: interactive ? toggle : null,
+      dense: true,
+      controlAffinity: ListTileControlAffinity.leading,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+      title: Text(_str(item['text']), style: theme.bodyMedium),
+      subtitle: detail.isEmpty
+          ? null
+          : Text(detail, style: theme.bodySmall),
+    );
+  }
+}
 
 // ── Notice ─────────────────────────────────────────────────────────────────
 

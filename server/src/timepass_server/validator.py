@@ -40,6 +40,14 @@ def catalog_id() -> str:
     return _catalog()["catalogId"]
 
 
+def known_props(component_type: str) -> set[str] | None:
+    """Top-level prop names for a component, or None if unknown type."""
+    schema = _catalog()["components"].get(component_type)
+    if schema is None:
+        return None
+    return set(schema.get("properties", {}))
+
+
 def validate_surface(components: list[dict[str, Any]]) -> None:
     """Raises SurfaceValidationError with all findings; returns None when valid."""
     errors: list[str] = []

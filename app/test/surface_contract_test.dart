@@ -99,6 +99,39 @@ void main() {
     expect(find.textContaining('Rahu kalam'), findsOneWidget);
   });
 
+  testWidgets('comparison table and interactive checklist render + toggle',
+      (tester) async {
+    final controller = buildController();
+    final surfaceId = feedFixture(controller, 'generic_comparison');
+    await pumpSurface(tester, controller, surfaceId);
+
+    expect(find.text('Mutual Funds vs FD'), findsOneWidget);
+    expect(find.text('Market-linked'), findsOneWidget);
+    expect(find.text('Returns are indicative.'), findsOneWidget);
+    expect(find.byType(CheckboxListTile), findsNWidgets(3));
+
+    final toggles = <Map<String, Object?>>[];
+    final sub = controller.onSubmit.listen((message) {
+      for (final part in message.parts.uiInteractionParts) {
+        final decoded = jsonDecode(part.interaction) as Map<String, Object?>;
+        final action = (decoded['action'] as Map).cast<String, Object?>();
+        if (action['name'] == 'checklist_toggled') {
+          toggles.add((action['context'] as Map).cast<String, Object?>());
+        }
+      }
+    });
+    addTearDown(sub.cancel);
+
+    final kycTile = find.widgetWithText(CheckboxListTile, 'Complete KYC');
+    tester.widget<CheckboxListTile>(kycTile).onChanged!(true);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+
+    expect(toggles, [
+      {'itemId': 'kyc', 'checked': true},
+    ]);
+  }, timeout: const Timeout(Duration(seconds: 30)));
+
   testWidgets('follow-up chip tap dispatches follow_up_selected',
       (tester) async {
     final controller = buildController();
