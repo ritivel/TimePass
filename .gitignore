@@ -25,3 +25,6 @@ catalog/dist/
 .DS_Store
 .idea/
 .vscode/
+
+# MCP debug sessions
+.playwright-mcp/
