@@ -8,7 +8,7 @@ See `PRODUCT_SPEC.md` (what & why) and `COMPONENT_CATALOG.md` (the UI contract).
 | Path | What |
 |---|---|
 | `catalog/` | **Source of truth** for the component catalog. `catalog.yaml` → generator → `catalog/dist/catalog.json` (A2UI catalog schema), `catalog/dist/system_prompt.md` (LLM prompt fragment), `app/lib/catalog/schemas.g.dart` (Flutter schemas). |
-| `server/` | Thin orchestrator (Python/FastAPI). Intent router → hero-category adapters (structured data) or Gemini generic tier → streams A2UI v0.9.1 messages (NDJSON). |
+| `server/` | Thin orchestrator (Python/FastAPI). Keyword fast-path (exact hero matches) or LLM pipeline — which can itself request adapter data (`needsData`) or search grounding (`needsSearch`) — → streams A2UI v0.9.1 messages (NDJSON). Voice: `/v1/asr` + `/v1/tts` (Sarvam). |
 | `app/` | Flutter client. Renders A2UI surfaces via `package:genui`; the catalog is the security boundary. |
 
 ## Quickstart
@@ -29,7 +29,11 @@ cd app && flutter run
 ```
 
 Real integrations are opt-in via env: `GEMINI_API_KEY` (generic tier; falls back to mock),
-adapter keys per category (fall back to fixtures). Secrets come from SSM (`_ssm_secret`), never committed.
+`SARVAM_API_KEY` (voice; endpoints 503 without it), adapter keys per category (fall back to
+fixtures). Secrets come from SSM (`_ssm_secret`), never committed.
+
+To serve a phone over Wi-Fi: run with `--host 0.0.0.0` and build the APK with
+`--dart-define=TIMEPASS_API=http://<laptop-LAN-IP>:8000`.
 
 ## Invariants (enforced, not suggested)
 
