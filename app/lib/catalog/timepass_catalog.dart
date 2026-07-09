@@ -1,9 +1,10 @@
-// TimePass custom catalog items (M0 set).
+// TimePass custom catalog items — "Quiet Interface" design pass.
 //
-// Styling is deliberately plain and neutral: consistent spacing and default
-// Material typography only. The post-M0 design pass restyles these widgets;
-// names, schemas, and behavior are the contract (COMPONENT_CATALOG.md) and
-// must not change there.
+// Every component is one polished implementation that all answers inherit
+// (DESIGN.md). Names, schemas, and behavior are the contract
+// (COMPONENT_CATALOG.md) and must not change here; only look and feel does.
+// Chrome stays neutral; color appears only where it carries meaning
+// (AQI bands, boundaries/wickets, alerts, festivals).
 
 import 'dart:async';
 
@@ -13,6 +14,8 @@ import 'package:genui/genui.dart';
 import 'package:json_schema_builder/json_schema_builder.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../theme/tp_theme.dart';
+import '../theme/tp_widgets.dart';
 import 'schemas.g.dart';
 
 /// All TimePass custom items, merged with the Basic Catalog by the caller.
@@ -32,8 +35,7 @@ List<CatalogItem> timepassCatalogItems() => [
 
 Schema _schemaFor(String name) => ObjectSchema.fromMap(componentSchemas[name]!);
 
-const _pad = EdgeInsets.all(16);
-const _gap = SizedBox(height: 8);
+const _gap = SizedBox(height: 10);
 
 // ── binding resolution ─────────────────────────────────────────────────────
 
@@ -103,14 +105,29 @@ List<String> _strList(Object? v) =>
 Widget _labeled(BuildContext context, String label, String value) {
   final theme = Theme.of(context).textTheme;
   return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 2),
+    padding: const EdgeInsets.symmetric(vertical: 3),
     child: Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        SizedBox(width: 110, child: Text(label, style: theme.bodySmall)),
+        SizedBox(width: 112, child: Text(label, style: theme.bodySmall)),
         Expanded(child: Text(value, style: theme.bodyMedium)),
       ],
     ),
+  );
+}
+
+/// Soft tinted tile for inline callouts (alerts, timings) — quiet, rounded,
+/// no borders or stripes.
+Widget _tintedTile(BuildContext context,
+    {required Color tint, required Widget child, EdgeInsetsGeometry? padding}) {
+  return Container(
+    padding:
+        padding ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+    decoration: BoxDecoration(
+      color: tint,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: child,
   );
 }
 
@@ -123,10 +140,31 @@ final _markdown = CatalogItem(
   dataSchema: _schemaFor('Markdown'),
   widgetBuilder: (itemContext) => _ResolvedProps(
     itemContext: itemContext,
-    builder: (context, props) => MarkdownBody(
-      data: _str(props['text']),
-      selectable: false,
-    ),
+    builder: (context, props) {
+      final theme = Theme.of(context).textTheme;
+      final t = context.tp;
+      return MarkdownBody(
+        data: _str(props['text']),
+        selectable: false,
+        styleSheet: MarkdownStyleSheet(
+          p: theme.bodyMedium,
+          h1: display(21, weight: FontWeight.w700, height: 1.3, color: t.ink),
+          h2: display(18, weight: FontWeight.w600, height: 1.3, color: t.ink),
+          h3: display(16, weight: FontWeight.w600, height: 1.3, color: t.ink),
+          listBullet: theme.bodyMedium,
+          blockquoteDecoration: BoxDecoration(
+            color: t.tile,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          blockquotePadding: const EdgeInsets.all(10),
+          code: theme.bodySmall?.copyWith(
+            fontFamily: 'monospace',
+            color: t.ink,
+            backgroundColor: t.tile,
+          ),
+        ),
+      );
+    },
   ),
 );
 
@@ -139,6 +177,7 @@ final _keyValueGrid = CatalogItem(
     itemContext: itemContext,
     builder: (context, props) {
       final theme = Theme.of(context).textTheme;
+      final t = context.tp;
       final title = _str(props['title']);
       final columns = props['columns'] is int ? props['columns'] as int : 2;
       final items = _mapList(props['items']);
@@ -149,10 +188,12 @@ final _keyValueGrid = CatalogItem(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_str(item['label']), style: theme.bodySmall),
+            const SizedBox(height: 1),
             Text(
               _str(item['value']),
               style: emphasis
-                  ? theme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)
+                  ? display(17, weight: FontWeight.w600, height: 1.3,
+                      color: t.ink)
                   : theme.bodyLarge,
             ),
           ],
@@ -175,20 +216,13 @@ final _keyValueGrid = CatalogItem(
         ));
       }
 
-      return Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: _pad,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (title.isNotEmpty) ...[
-                Text(title, style: theme.titleMedium),
-                _gap,
-              ],
-              ...rows,
-            ],
-          ),
+      return TpCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (title.isNotEmpty) ...[TpSectionHeader(title), _gap],
+            ...rows,
+          ],
         ),
       );
     },
@@ -204,6 +238,7 @@ final _comparisonTable = CatalogItem(
     itemContext: itemContext,
     builder: (context, props) {
       final theme = Theme.of(context).textTheme;
+      final t = context.tp;
       final title = _str(props['title']);
       final columns = _mapList(props['columns']);
       final rows = _mapList(props['rows']);
@@ -211,75 +246,65 @@ final _comparisonTable = CatalogItem(
       final footnote = _str(props['footnote']);
       final highlightIndex =
           columns.indexWhere((c) => _str(c['key']) == highlightKey);
-      final highlightColor =
-          Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.4);
 
       TableCell cell(Widget child, int columnIndex) => TableCell(
             child: Container(
-              color: columnIndex == highlightIndex ? highlightColor : null,
+              color: columnIndex == highlightIndex ? t.tile : null,
               padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
               child: child,
             ),
           );
 
-      return Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: _pad,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (title.isNotEmpty) ...[
-                Text(title, style: theme.titleMedium),
-                _gap,
-              ],
-              Table(
-                columnWidths: const {0: IntrinsicColumnWidth()},
-                defaultVerticalAlignment: TableCellVerticalAlignment.top,
-                border: TableBorder(
-                  horizontalInside:
-                      BorderSide(color: Colors.grey.shade200),
+      return TpCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (title.isNotEmpty) ...[TpSectionHeader(title), _gap],
+            Table(
+              columnWidths: const {0: IntrinsicColumnWidth()},
+              defaultVerticalAlignment: TableCellVerticalAlignment.top,
+              border: TableBorder(
+                horizontalInside: BorderSide(color: t.tile),
+              ),
+              children: [
+                TableRow(
+                  children: [
+                    cell(const SizedBox(), -1),
+                    for (final (i, col) in columns.indexed)
+                      cell(
+                        Text(_str(col['label']),
+                            style: display(13, weight: FontWeight.w600,
+                                height: 1.3, color: t.ink)),
+                        i,
+                      ),
+                  ],
                 ),
-                children: [
+                for (final row in rows)
                   TableRow(
                     children: [
-                      cell(const SizedBox(), -1),
-                      for (final (i, col) in columns.indexed)
+                      cell(
+                          Text(_str(row['label']), style: theme.bodySmall),
+                          -1),
+                      for (final (i, _) in columns.indexed)
                         cell(
-                          Text(_str(col['label']),
-                              style: theme.bodySmall
-                                  ?.copyWith(fontWeight: FontWeight.w600)),
+                          Text(
+                            i < _strList(row['cells']).length
+                                ? _strList(row['cells'])[i]
+                                : '',
+                            style: theme.bodyMedium,
+                          ),
                           i,
                         ),
                     ],
                   ),
-                  for (final row in rows)
-                    TableRow(
-                      children: [
-                        cell(
-                            Text(_str(row['label']), style: theme.bodySmall),
-                            -1),
-                        for (final (i, _) in columns.indexed)
-                          cell(
-                            Text(
-                              i < _strList(row['cells']).length
-                                  ? _strList(row['cells'])[i]
-                                  : '',
-                              style: theme.bodyMedium,
-                            ),
-                            i,
-                          ),
-                      ],
-                    ),
-                ],
-              ),
-              if (footnote.isNotEmpty) ...[
-                _gap,
-                Text(footnote, style: theme.bodySmall),
               ],
+            ),
+            if (footnote.isNotEmpty) ...[
+              _gap,
+              Text(footnote, style: theme.bodySmall),
             ],
-          ),
+          ],
         ),
       );
     },
@@ -311,27 +336,22 @@ class _ChecklistWidgetState extends State<_ChecklistWidget> {
     return _ResolvedProps(
       itemContext: widget.itemContext,
       builder: (context, props) {
-        final theme = Theme.of(context).textTheme;
         final title = _str(props['title']);
         final items = _mapList(props['items']);
         final interactive = props['interactive'] == true;
 
-        return Card(
-          margin: EdgeInsets.zero,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (title.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: Text(title, style: theme.titleMedium),
-                  ),
-                for (final item in items)
-                  _row(context, item, interactive),
-              ],
-            ),
+        return TpCard(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (title.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(18, 2, 18, 6),
+                  child: TpSectionHeader(title),
+                ),
+              for (final item in items) _row(context, item, interactive),
+            ],
           ),
         );
       },
@@ -341,6 +361,7 @@ class _ChecklistWidgetState extends State<_ChecklistWidget> {
   Widget _row(
       BuildContext context, Map<String, Object?> item, bool interactive) {
     final theme = Theme.of(context).textTheme;
+    final t = context.tp;
     final id = _str(item['id']);
     final checked = _checked[id] ?? (item['checked'] == true);
     final detail = _str(item['detail']);
@@ -361,11 +382,18 @@ class _ChecklistWidgetState extends State<_ChecklistWidget> {
       onChanged: interactive ? toggle : null,
       dense: true,
       controlAffinity: ListTileControlAffinity.leading,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-      title: Text(_str(item['text']), style: theme.bodyMedium),
-      subtitle: detail.isEmpty
-          ? null
-          : Text(detail, style: theme.bodySmall),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+      title: Text(
+        _str(item['text']),
+        style: checked
+            ? theme.bodyMedium?.copyWith(
+                color: t.inkMuted,
+                decoration: TextDecoration.lineThrough,
+                decorationColor: t.inkMuted,
+              )
+            : theme.bodyMedium,
+      ),
+      subtitle: detail.isEmpty ? null : Text(detail, style: theme.bodySmall),
     );
   }
 }
@@ -378,37 +406,46 @@ final _notice = CatalogItem(
   widgetBuilder: (itemContext) => _ResolvedProps(
     itemContext: itemContext,
     builder: (context, props) {
+      final t = context.tp;
       final variant = _str(props['variant'], 'info');
       final dense = props['dense'] == true;
-      final (icon, color) = switch (variant) {
-        'warning' => (Icons.warning_amber_rounded, Colors.orange.shade800),
-        'legal' => (Icons.info_outline, Colors.blueGrey.shade600),
-        'success' => (Icons.check_circle_outline, Colors.green.shade700),
-        _ => (Icons.info_outline, Colors.blue.shade700),
+      final (icon, iconColor, tint) = switch (variant) {
+        'warning' => (
+            Icons.warning_amber_rounded,
+            t.signalRed,
+            t.signalRed.withValues(alpha: 0.08)
+          ),
+        'success' => (
+            Icons.check_circle_outline,
+            t.signalGreen,
+            t.signalGreen.withValues(alpha: 0.08)
+          ),
+        'legal' => (Icons.balance_outlined, t.inkMuted, t.tile),
+        _ => (Icons.info_outline, t.inkMuted, t.tile),
       };
-      return Container(
-        padding: dense
-            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 6)
-            : const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                _str(props['text']),
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: color),
+      return TpEnter(
+        child: _tintedTile(
+          context,
+          tint: tint,
+          padding: dense
+              ? const EdgeInsets.symmetric(horizontal: 12, vertical: 8)
+              : const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, size: 17, color: iconColor),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  _str(props['text']),
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: t.ink.withValues(alpha: 0.8)),
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       );
     },
@@ -416,6 +453,7 @@ final _notice = CatalogItem(
 );
 
 // ── SourceChips ────────────────────────────────────────────────────────────
+// Trust surface: 1–2 real sources beat many (DESIGN_RESEARCH.md §b5).
 
 final _sourceChips = CatalogItem(
   name: 'SourceChips',
@@ -424,15 +462,19 @@ final _sourceChips = CatalogItem(
     itemContext: itemContext,
     builder: (context, props) {
       final sources = _mapList(props['sources']);
-      final theme = Theme.of(context).textTheme;
+      final t = context.tp;
       return Wrap(
         spacing: 8,
-        runSpacing: 4,
+        runSpacing: 6,
         children: [
           for (final s in sources)
             ActionChip(
-              avatar: const Icon(Icons.public, size: 14),
-              label: Text(_str(s['domain']), style: theme.labelSmall),
+              backgroundColor: t.tile,
+              avatar: Icon(Icons.language, size: 14, color: t.inkMuted),
+              label: Text(
+                _str(s['domain']),
+                style: TextStyle(fontSize: 12.5, color: t.link),
+              ),
               tooltip: _str(s['title']),
               visualDensity: VisualDensity.compact,
               onPressed: () {
@@ -464,13 +506,22 @@ final _followUpChips = CatalogItem(
     itemContext: itemContext,
     builder: (context, props) {
       final suggestions = _mapList(props['suggestions']);
+      final t = context.tp;
       return Wrap(
         spacing: 8,
-        runSpacing: 4,
+        runSpacing: 8,
         children: [
           for (final s in suggestions)
             ActionChip(
-              label: Text(_str(s['label'])),
+              backgroundColor: t.tile,
+              label: Text(
+                _str(s['label']),
+                style: TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    height: 1.35,
+                    color: t.ink),
+              ),
               onPressed: () => itemContext.dispatchEvent(
                 UserActionEvent(
                   name: 'follow_up_selected',
@@ -494,102 +545,97 @@ final _cricketLiveScore = CatalogItem(
     itemContext: itemContext,
     builder: (context, props) {
       final theme = Theme.of(context).textTheme;
+      final t = context.tp;
       final teams = _mapList(props['teams']);
       final batters = _mapList(props['batters']);
       final bowler = _map(props['bowler']);
       final balls = _strList(props['recentBalls']);
 
       Widget teamRow(Map<String, Object?> team) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2),
+            padding: const EdgeInsets.symmetric(vertical: 3),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
               children: [
                 SizedBox(
-                  width: 56,
+                  width: 62,
                   child: Text(_str(team['shortName']),
-                      style: theme.titleMedium),
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: t.inkMuted)),
                 ),
                 Text(_str(team['scoreText']),
-                    style:
-                        theme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+                    style: display(22, weight: FontWeight.w700, height: 1.2,
+                        color: t.ink)),
                 const SizedBox(width: 8),
                 Text('(${_str(team['oversText'])})', style: theme.bodySmall),
               ],
             ),
           );
 
-      return Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: _pad,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(_str(props['matchTitle']),
-                        style: theme.titleMedium),
-                  ),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text('LIVE',
-                        style: theme.labelSmall
-                            ?.copyWith(color: Colors.red.shade700)),
-                  ),
-                ],
-              ),
-              _gap,
-              ...teams.map(teamRow),
-              _gap,
-              Text(_str(props['statusText']),
-                  style: theme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
-              if (batters.isNotEmpty) ...[
-                _gap,
-                Text(
-                  batters
-                      .map((b) =>
-                          '${_str(b['name'])} ${_str(b['runsText'])} (${_str(b['ballsText'])})')
-                      .join('  •  '),
-                  style: theme.bodyMedium,
-                ),
-              ],
-              if (bowler.isNotEmpty)
-                Text(
-                  '${_str(bowler['name'])} ${_str(bowler['figuresText'])} (${_str(bowler['oversText'])})',
-                  style: theme.bodyMedium,
-                ),
-              if (balls.isNotEmpty) ...[
-                _gap,
-                Row(
-                  children: [
-                    for (final ball in balls)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 6),
-                        child: CircleAvatar(
-                          radius: 12,
-                          backgroundColor: ball == 'W'
-                              ? Colors.red.shade100
-                              : ball == '4' || ball == '6'
-                                  ? Colors.green.shade100
-                                  : Colors.grey.shade200,
-                          child: Text(ball, style: theme.labelSmall),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
+      Widget ballDot(String ball) {
+        final (bg, fg) = switch (ball) {
+          'W' => (t.signalRed, Colors.white),
+          '4' || '6' => (t.signalGreen, Colors.white),
+          _ => (t.tile, t.ink),
+        };
+        return Container(
+          width: 27,
+          height: 27,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(color: bg, shape: BoxShape.circle),
+          child: Text(ball,
+              style: TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.w700, color: fg)),
+        );
+      }
+
+      return TpCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TpSectionHeader(_str(props['matchTitle']),
+                trailing: const LiveBadge()),
+            _gap,
+            ...teams.map(teamRow),
+            const SizedBox(height: 6),
+            Text(_str(props['statusText']),
+                style: display(15, weight: FontWeight.w600, height: 1.35,
+                    color: t.ink)),
+            if (batters.isNotEmpty) ...[
               _gap,
               Text(
-                'updated ${_str(props['updatedAtText'])}',
-                style: theme.bodySmall,
+                batters
+                    .map((b) =>
+                        '${_str(b['name'])} ${_str(b['runsText'])} (${_str(b['ballsText'])})')
+                    .join('  •  '),
+                style: theme.bodyMedium,
               ),
             ],
-          ),
+            if (bowler.isNotEmpty)
+              Text(
+                '${_str(bowler['name'])} ${_str(bowler['figuresText'])} (${_str(bowler['oversText'])})',
+                style: theme.bodyMedium,
+              ),
+            if (balls.isNotEmpty) ...[
+              _gap,
+              Row(
+                children: [
+                  for (final ball in balls)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 6),
+                      child: ballDot(ball),
+                    ),
+                ],
+              ),
+            ],
+            _gap,
+            Text(
+              'updated ${_str(props['updatedAtText'])}',
+              style: theme.bodySmall,
+            ),
+          ],
         ),
       );
     },
@@ -605,6 +651,7 @@ final _panchangCard = CatalogItem(
     itemContext: itemContext,
     builder: (context, props) {
       final theme = Theme.of(context).textTheme;
+      final t = context.tp;
       String timing(Object? v) {
         final m = _map(v);
         final ends = _str(m['endsAtText']);
@@ -614,47 +661,48 @@ final _panchangCard = CatalogItem(
       final rahu = _map(props['rahuKalam']);
       final festivals = _strList(props['festivals']);
 
-      return Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: _pad,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_str(props['locationName']), style: theme.bodySmall),
-              Text(_str(props['dateText']), style: theme.titleMedium),
-              _gap,
-              _labeled(context, 'Tithi', timing(props['tithi'])),
-              _labeled(context, 'Nakshatra', timing(props['nakshatra'])),
-              if (_map(props['yoga']).isNotEmpty)
-                _labeled(context, 'Yoga', timing(props['yoga'])),
-              if (_map(props['karana']).isNotEmpty)
-                _labeled(context, 'Karana', timing(props['karana'])),
-              _labeled(
-                context,
-                'Sunrise / Sunset',
-                '${_str(props['sunriseText'])} / ${_str(props['sunsetText'])}',
+      return TpCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(_str(props['locationName']), style: theme.bodySmall),
+            const SizedBox(height: 2),
+            Text(_str(props['dateText']),
+                style: display(19, weight: FontWeight.w700, height: 1.3,
+                    color: t.ink)),
+            _gap,
+            _labeled(context, 'Tithi', timing(props['tithi'])),
+            _labeled(context, 'Nakshatra', timing(props['nakshatra'])),
+            if (_map(props['yoga']).isNotEmpty)
+              _labeled(context, 'Yoga', timing(props['yoga'])),
+            if (_map(props['karana']).isNotEmpty)
+              _labeled(context, 'Karana', timing(props['karana'])),
+            _labeled(
+              context,
+              'Sunrise / Sunset',
+              '${_str(props['sunriseText'])} / ${_str(props['sunsetText'])}',
+            ),
+            _gap,
+            _tintedTile(
+              context,
+              tint: t.warnAmber.withValues(alpha: 0.12),
+              child: Text(
+                'Rahu kalam  ${_str(rahu['startText'])} – ${_str(rahu['endText'])}',
+                style: theme.bodyMedium,
               ),
-              _gap,
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Rahu kalam  ${_str(rahu['startText'])} – ${_str(rahu['endText'])}',
-                  style: theme.bodyMedium,
+            ),
+            for (final f in festivals)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('◆ ', style: TextStyle(color: t.warnAmber)),
+                    Expanded(child: Text(f, style: theme.bodyMedium)),
+                  ],
                 ),
               ),
-              for (final f in festivals)
-                Padding(
-                  padding: const EdgeInsets.only(top: 8),
-                  child: Text('◆ $f', style: theme.bodyMedium),
-                ),
-            ],
-          ),
+          ],
         ),
       );
     },
@@ -682,6 +730,7 @@ final _weatherStrip = CatalogItem(
     itemContext: itemContext,
     builder: (context, props) {
       final theme = Theme.of(context).textTheme;
+      final t = context.tp;
       final current = _map(props['current']);
       final days = _mapList(props['days']);
       final alerts = _mapList(props['alerts']);
@@ -691,69 +740,66 @@ final _weatherStrip = CatalogItem(
         _str(current['windText']),
       ].where((s) => s.isNotEmpty).join('  ·  ');
 
-      return Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: _pad,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(_str(props['locationName']), style: theme.titleMedium),
-              _gap,
-              Row(
+      return TpCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TpSectionHeader(_str(props['locationName'])),
+            _gap,
+            Row(
+              children: [
+                Icon(_conditionIcon(_str(current['condition'])),
+                    size: 36, color: t.ink),
+                const SizedBox(width: 12),
+                Text(_str(current['tempText']),
+                    style: display(34, weight: FontWeight.w700, height: 1.1,
+                        color: t.ink)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(_str(current['conditionText']),
+                      style: theme.bodyMedium),
+                ),
+              ],
+            ),
+            if (details.isNotEmpty) Text(details, style: theme.bodySmall),
+            _gap,
+            const Divider(height: 16),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
                 children: [
-                  Icon(_conditionIcon(_str(current['condition'])), size: 40),
-                  const SizedBox(width: 12),
-                  Text(_str(current['tempText']), style: theme.displaySmall),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(_str(current['conditionText']),
-                        style: theme.bodyMedium),
-                  ),
+                  for (final day in days)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 20),
+                      child: Column(
+                        children: [
+                          Text(_str(day['dayLabel']),
+                              style: theme.bodySmall),
+                          const SizedBox(height: 4),
+                          Icon(_conditionIcon(_str(day['condition'])),
+                              size: 20, color: t.inkMuted),
+                          const SizedBox(height: 4),
+                          Text(_str(day['maxText']),
+                              style: display(14.5,
+                                  weight: FontWeight.w600, color: t.ink)),
+                          Text(_str(day['minText']), style: theme.bodySmall),
+                        ],
+                      ),
+                    ),
                 ],
               ),
-              if (details.isNotEmpty) Text(details, style: theme.bodySmall),
-              _gap,
-              const Divider(height: 16),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    for (final day in days)
-                      Padding(
-                        padding: const EdgeInsets.only(right: 20),
-                        child: Column(
-                          children: [
-                            Text(_str(day['dayLabel']),
-                                style: theme.bodySmall),
-                            const SizedBox(height: 4),
-                            Icon(_conditionIcon(_str(day['condition'])),
-                                size: 20),
-                            const SizedBox(height: 4),
-                            Text(_str(day['maxText']),
-                                style: theme.bodyMedium
-                                    ?.copyWith(fontWeight: FontWeight.w600)),
-                            Text(_str(day['minText']), style: theme.bodySmall),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              for (final alert in alerts)
-                Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
+            ),
+            for (final alert in alerts)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: _tintedTile(
+                  context,
+                  tint: t.signalRed.withValues(alpha: 0.08),
                   child: Row(
                     children: [
                       Icon(Icons.warning_amber_rounded,
-                          size: 16, color: Colors.orange.shade800),
-                      const SizedBox(width: 6),
+                          size: 16, color: t.signalRed),
+                      const SizedBox(width: 7),
                       Expanded(
                         child: Text(_str(alert['text']),
                             style: theme.bodySmall),
@@ -761,8 +807,8 @@ final _weatherStrip = CatalogItem(
                     ],
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       );
     },
@@ -772,14 +818,82 @@ final _weatherStrip = CatalogItem(
 // ── AqiMeter ───────────────────────────────────────────────────────────────
 
 Color _aqiColor(String category) => switch (category) {
-      'good' => Colors.green.shade600,
-      'satisfactory' => Colors.lightGreen.shade700,
-      'moderate' => Colors.amber.shade700,
-      'poor' => Colors.orange.shade800,
-      'veryPoor' => Colors.red.shade700,
-      'severe' => Colors.red.shade900,
+      'good' => const Color(0xFF2E9E44),
+      'satisfactory' => const Color(0xFF7BAE3A),
+      'moderate' => const Color(0xFFD9A514),
+      'poor' => const Color(0xFFDD7E23),
+      'veryPoor' => const Color(0xFFE0453A),
+      'severe' => const Color(0xFF9C2A1F),
       _ => Colors.grey,
     };
+
+/// The six CPCB bands as a segmented scale with a marker at the reading —
+/// the meter encodes the real Indian AQI categories, not an abstract 0–100%.
+class _CpcbScale extends StatelessWidget {
+  const _CpcbScale({required this.aqi});
+
+  final int aqi;
+
+  static const _bands = [
+    (50, 'good'),
+    (100, 'satisfactory'),
+    (200, 'moderate'),
+    (300, 'poor'),
+    (400, 'veryPoor'),
+    (500, 'severe'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tp;
+    final fraction = (aqi / 500).clamp(0.0, 1.0);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        return SizedBox(
+          height: 14,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                top: 4,
+                bottom: 4,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(3),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < _bands.length; i++)
+                        Expanded(
+                          flex: _bands[i].$1 - (i == 0 ? 0 : _bands[i - 1].$1),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 1),
+                            color: _aqiColor(_bands[i].$2)
+                                .withValues(alpha: 0.28),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              Positioned(
+                left: (width * fraction - 1.5).clamp(0.0, width - 3),
+                top: 0,
+                bottom: 0,
+                child: Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: t.ink,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
 
 final _aqiMeter = CatalogItem(
   name: 'AqiMeter',
@@ -799,46 +913,39 @@ final _aqiMeter = CatalogItem(
             : 'updated ${_str(props['updatedAtText'])} ago',
       ].where((s) => s.isNotEmpty).join(' · ');
 
-      return Card(
-        margin: EdgeInsets.zero,
-        child: Padding(
-          padding: _pad,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('AQI · ${_str(props['locationName'])}',
-                  style: theme.titleMedium),
-              _gap,
-              Row(
-                children: [
-                  Text('$aqi',
-                      style: theme.displayMedium?.copyWith(color: color)),
-                  const SizedBox(width: 16),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Text(_str(props['categoryText']),
-                        style: theme.titleSmall?.copyWith(color: color)),
+      return TpCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TpSectionHeader('AQI · ${_str(props['locationName'])}'),
+            _gap,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text('$aqi',
+                    style: display(44, weight: FontWeight.w700, height: 1.05,
+                        color: color)),
+                const SizedBox(width: 14),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.11),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ],
-              ),
-              _gap,
-              LinearProgressIndicator(
-                value: (aqi / 500).clamp(0.0, 1.0),
-                color: color,
-                backgroundColor: Colors.grey.shade200,
-                minHeight: 6,
-              ),
-              _gap,
-              if (meta.isNotEmpty) Text(meta, style: theme.bodySmall),
-              _gap,
-              Text(_str(props['healthAdviceText']), style: theme.bodyMedium),
-            ],
-          ),
+                  child: Text(_str(props['categoryText']),
+                      style: display(13.5, weight: FontWeight.w600,
+                          color: color)),
+                ),
+              ],
+            ),
+            _gap,
+            _CpcbScale(aqi: aqi),
+            _gap,
+            if (meta.isNotEmpty) Text(meta, style: theme.bodySmall),
+            const SizedBox(height: 6),
+            Text(_str(props['healthAdviceText']), style: theme.bodyMedium),
+          ],
         ),
       );
     },

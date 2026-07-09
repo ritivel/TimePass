@@ -1,7 +1,15 @@
 # TimePass — Progress
 
 **Updated:** 2026-07-09 · living document, newest state first.
-Companion docs: `PRODUCT_SPEC.md` (what & why) · `COMPONENT_CATALOG.md` (UI contract) · `README.md` (how to run).
+Companion docs: `PRODUCT_SPEC.md` (what & why) · `COMPONENT_CATALOG.md` (UI contract) · `DESIGN.md` (style bible) · `DESIGN_RESEARCH.md` (design evidence) · `README.md` (how to run).
+
+## Round 5 — the design pass ("Quiet Interface")
+
+Deep research first (110-agent verified run → `DESIGN_RESEARCH.md`): Monogram's own careers page frames motion craft on a small set of polished primitives as the product (2 of 7 openings are design roles) — which is exactly our catalog architecture; plus verified evidence on citation-trust (1–2 real sources beat many), latency psychology (>4s degrades; subtle/conversational waiting states beat spinners), and Indic type rules (fixed line-heights, no heavy bolds).
+
+First attempt was **"Station Board"** (Indian Railways signage: yellow query strips, enamel blue, bundled Anek fonts) — user rejected it (too loud, wanted the Monogram feel), and a live teardown of monogram.ai confirmed their language is the opposite: **quiet chrome, colorful content**. Final system (`DESIGN.md`, `app/lib/theme/`): white surfaces; near-black as the only chrome accent (big round mic, buttons); soft gray tiles, radius 20, no borders; white cards floating on soft shadows; semibold sentence-case section headers; gray query bubbles; `ThinkingDots` instead of spinners; semantic color only inside content (CPCB AQI bands, W/4/6 balls, IMD alerts, LIVE lamp); system fonts (Anek dropped, −4.4 MB). Empty state = 2×2 grid of **generated soft-3D objects** (`gpt-image-1.5`, transparent, de-glowed, 16–28 KB WebP each: cricket ball, sun-cloud, diya, leaf) firing trilingual sample queries — the Monogram ingredient-tile pattern. All 11 components re-skinned, shell rebuilt, 5/5 contract tests green, analyzer clean, verified in-browser light+dark (`design-*.png`).
+
+Learned this round: gpt-image-2 has no transparent-background param (use 1.5 for isolated objects) and models bake ambient glow even when told not to — de-glow programmatically (alpha threshold) before shipping; never case-transform server content (uppercase broke text-fidelity tests and is meaningless for Indic); `Future.delayed` in entrance animations leaves pending timers in widget tests (use cancelable `Timer`); a `TpCard` built from a plain decorated `Container` breaks `CheckboxListTile` ink (needs a `Material` surface); theme extensions need brightness fallbacks so catalog components render under any host theme. Remaining design work in `DESIGN.md` §open (more category objects, Rive mic moment, stagger, streaming shimmer, low-end QA).
 
 ## Where we are, in one paragraph
 

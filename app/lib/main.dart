@@ -1,7 +1,9 @@
-// TimePass M0 shell: query in → generated visual answer out.
+// TimePass shell — "Quiet Interface" design pass (see DESIGN.md).
 //
-// Deliberately plain chrome (M0). The answer surfaces themselves are rendered
-// by genui from the server's A2UI stream against the TimePass catalog.
+// The answer surfaces themselves are rendered by genui from the server's
+// A2UI stream against the TimePass catalog; the shell stays out of the way:
+// white chrome, one black accent (the mic), gray query bubbles, thinking
+// dots while the answer forms, soft-3D object tiles on the empty state.
 
 import 'dart:async';
 import 'dart:convert';
@@ -19,6 +21,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api/orchestrator_client.dart';
 import 'catalog/schemas.g.dart' as generated;
 import 'catalog/timepass_catalog.dart';
+import 'theme/tp_theme.dart';
+import 'theme/tp_widgets.dart';
 
 void main() {
   runApp(const TimePassApp());
@@ -31,10 +35,8 @@ class TimePassApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'TimePass',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.teal,
-        useMaterial3: true,
-      ),
+      theme: tpTheme(Brightness.light),
+      darkTheme: tpTheme(Brightness.dark),
       home: const AnswerScreen(),
     );
   }
@@ -287,8 +289,8 @@ class _AnswerScreenState extends State<AnswerScreen> {
       if (_scroll.hasClients) {
         _scroll.animateTo(
           _scroll.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOut,
+          duration: TpMotion.enter,
+          curve: TpMotion.enterCurve,
         );
       }
     });
@@ -321,14 +323,18 @@ class _AnswerScreenState extends State<AnswerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context).textTheme;
+    final t = context.tp;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('TimePass'),
+        titleSpacing: 20,
+        title: const _Wordmark(),
         actions: [
           DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: _lang,
+              borderRadius: BorderRadius.circular(12),
+              style: TextStyle(
+                  fontSize: 14, fontWeight: FontWeight.w600, color: t.ink),
               items: const [
                 DropdownMenuItem(value: 'en', child: Text('EN')),
                 DropdownMenuItem(value: 'hi', child: Text('हिं')),
@@ -344,16 +350,10 @@ class _AnswerScreenState extends State<AnswerScreen> {
         children: [
           Expanded(
             child: _answers.isEmpty
-                ? Center(
-                    child: Text(
-                      'Ask anything —\ncricket score, panchang, weather, AQI…',
-                      textAlign: TextAlign.center,
-                      style: theme.bodyLarge,
-                    ),
-                  )
+                ? _EmptyState(onAsk: _send)
                 : ListView.builder(
                     controller: _scroll,
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.fromLTRB(14, 8, 14, 12),
                     itemCount: _answers.length,
                     itemBuilder: (context, index) => _AnswerTile(
                       answer: _answers[index],
@@ -365,58 +365,187 @@ class _AnswerScreenState extends State<AnswerScreen> {
           ),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _input,
-                      onSubmitted: _send,
-                      textInputAction: TextInputAction.send,
-                      decoration: InputDecoration(
-                        hintText: _recording
-                            ? 'Listening…'
-                            : _transcribing
-                                ? 'Transcribing…'
-                                : 'Ask anything…',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
+              padding: const EdgeInsets.fromLTRB(14, 6, 14, 14),
+              // The floating input bar: one white pill, soft shadow, with
+              // the black mic as the primary (voice-first) control.
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(18, 4, 6, 4),
+                decoration: BoxDecoration(
+                  color: t.card,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                        color: t.shadow,
+                        blurRadius: 24,
+                        offset: const Offset(0, 6)),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _input,
+                        onSubmitted: _send,
+                        textInputAction: TextInputAction.send,
+                        decoration: InputDecoration(
+                          hintText: _recording
+                              ? 'Listening…'
+                              : _transcribing
+                                  ? 'Transcribing…'
+                                  : 'Ask anything…',
+                          hintStyle: TextStyle(color: t.inkMuted),
+                          border: InputBorder.none,
+                          contentPadding:
+                              const EdgeInsets.symmetric(vertical: 14),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 10),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  _transcribing
-                      ? const Padding(
-                          padding: EdgeInsets.all(10),
-                          child: SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        )
-                      : IconButton.filled(
-                          style: _recording
-                              ? IconButton.styleFrom(
-                                  backgroundColor:
-                                      Theme.of(context).colorScheme.error,
-                                )
-                              : null,
-                          icon: Icon(_recording ? Icons.stop : Icons.mic),
-                          onPressed: _toggleMic,
-                        ),
-                  const SizedBox(width: 4),
-                  IconButton.filled(
-                    icon: const Icon(Icons.arrow_upward),
-                    onPressed: () => _send(_input.text),
-                  ),
-                ],
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: Icon(Icons.arrow_upward, color: t.inkMuted),
+                      tooltip: 'Ask',
+                      onPressed: () => _send(_input.text),
+                    ),
+                    _transcribing
+                        ? const Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 14),
+                            child: ThinkingDots(),
+                          )
+                        : _MicButton(recording: _recording, onTap: _toggleMic),
+                  ],
+                ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Plain wordmark — the chrome stays quiet.
+class _Wordmark extends StatelessWidget {
+  const _Wordmark();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text('TimePass',
+        style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.4,
+            color: context.tp.ink));
+  }
+}
+
+/// The mic: the one black accent — big, round, unmistakable. Red while
+/// recording.
+class _MicButton extends StatelessWidget {
+  const _MicButton({required this.recording, required this.onTap});
+
+  final bool recording;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tp;
+    return AnimatedContainer(
+      duration: TpMotion.fast,
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: recording ? t.signalRed : t.action,
+        boxShadow: recording
+            ? [
+                BoxShadow(
+                  color: t.signalRed.withValues(alpha: 0.4),
+                  blurRadius: 14,
+                ),
+              ]
+            : null,
+      ),
+      child: IconButton(
+        icon: Icon(recording ? Icons.stop : Icons.mic,
+            color: recording ? Colors.white : t.onAction),
+        tooltip: recording ? 'Stop listening' : 'Ask by voice',
+        onPressed: onTap,
+      ),
+    );
+  }
+}
+
+/// First-run screen: soft-3D category tiles (generated, see DESIGN.md) that
+/// fire a sample query in each script.
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onAsk});
+
+  final void Function(String query) onAsk;
+
+  static const _tiles = [
+    ('assets/art/obj_ball.webp', 'Cricket', 'IND vs AUS score'),
+    ('assets/art/obj_weather.webp', 'Weather', 'హైదరాబాద్ వాతావరణం'),
+    ('assets/art/obj_diya.webp', 'Panchang', 'Aaj ka panchang'),
+    ('assets/art/obj_air.webp', 'Air quality', 'दिल्ली में AQI कितना है?'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final t = context.tp;
+    return Center(
+      child: TpEnter(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Ask anything.',
+                  style: display(30, weight: FontWeight.w700, height: 1.15,
+                      color: t.ink)),
+              const SizedBox(height: 6),
+              Text(
+                'The answer arrives as its own little app — scores, panchang, weather, AQI. Speak or type, in हिंदी, తెలుగు, or English.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: t.inkMuted,
+                    ),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  for (final (i, tile) in _tiles.indexed.take(2).toList()) ...[
+                    if (i > 0) const SizedBox(width: 12),
+                    Expanded(
+                      child: SampleTile(
+                        asset: tile.$1,
+                        label: tile.$2,
+                        query: tile.$3,
+                        onTap: () => onAsk(tile.$3),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  for (final (i, tile)
+                      in _tiles.indexed.skip(2).toList()) ...[
+                    if (i > 2) const SizedBox(width: 12),
+                    Expanded(
+                      child: SampleTile(
+                        asset: tile.$1,
+                        label: tile.$2,
+                        query: tile.$3,
+                        onTap: () => onAsk(tile.$3),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -438,34 +567,27 @@ class _AnswerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context).textTheme;
-    final colors = Theme.of(context).colorScheme;
+    final t = context.tp;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.only(bottom: 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Align(
             alignment: Alignment.centerRight,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: colors.secondaryContainer,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Text(answer.query, style: theme.bodyMedium),
-            ),
+            child: QueryBubble(text: answer.query),
           ),
           const SizedBox(height: 12),
           if (answer.error != null)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: colors.errorContainer.withValues(alpha: 0.4),
-                borderRadius: BorderRadius.circular(12),
+                color: t.signalRed.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(14),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.cloud_off, size: 18, color: colors.error),
+                  Icon(Icons.cloud_off, size: 18, color: t.signalRed),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -482,26 +604,28 @@ class _AnswerTile extends StatelessWidget {
               ),
             )
           else ...[
-            if (answer.loading) const LinearProgressIndicator(minHeight: 2),
+            if (answer.loading)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 10, left: 4),
+                child: ThinkingDots(),
+              ),
             Surface(surfaceContext: controller.contextFor(answer.surfaceId)),
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Row(
                 children: [
                   if (answer.live) ...[
-                    Icon(Icons.sensors, size: 14, color: colors.error),
-                    const SizedBox(width: 4),
-                    Text('LIVE',
-                        style: theme.labelSmall?.copyWith(color: colors.error)),
+                    const LiveBadge(),
                     const SizedBox(width: 10),
                   ],
                   if (answer.caption.isNotEmpty) ...[
                     InkWell(
                       onTap: () => onSpeak(answer.caption),
-                      borderRadius: BorderRadius.circular(12),
-                      child: const Padding(
-                        padding: EdgeInsets.all(4),
-                        child: Icon(Icons.volume_up_outlined, size: 16),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(Icons.volume_up_outlined,
+                            size: 16, color: t.inkMuted),
                       ),
                     ),
                     const SizedBox(width: 4),
