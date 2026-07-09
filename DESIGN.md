@@ -64,7 +64,7 @@ What we took from the Monogram teardown (their homepage + in-app mockups, 2026-0
 
 - Wordmark: plain `TimePass` w700 — no marks, no color.
 - Input bar: one floating white pill (soft shadow) — borderless text field, muted send arrow, and the **black circular mic** as the primary control (red while recording).
-- Empty state: "Ask anything." + 2×2 grid of `SampleTile`s (generated soft-3D objects: cricket ball, sun-cloud, diya, leaf) firing trilingual sample queries.
+- Empty state: "Ask anything." + 2×2 grid of `SampleTile`s (generated soft-3D objects: cricket ball, sun-cloud, diya, leaf) firing hi/en sample queries (te returns in phase 2).
 - Errors: red-tinted tile, plain language, Retry.
 
 ## Asset pipeline (proven 2026-07-09, both generations)

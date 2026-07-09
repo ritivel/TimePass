@@ -16,13 +16,13 @@
 
 1. **Android first.** Android = ~93% of Indian mobile OS share vs ~6.9% iOS ([StatCounter, Jun 2026](https://gs.statcounter.com/os-market-share/mobile/india)). Built in Flutter → iOS ships later nearly free.
 2. **No subscriptions.** IN/SEA converts downloads→paid at 0.7% (vs 2.8% NA), $14 first-year LTV per payer ([RevenueCat 2026](https://www.revenuecat.com/state-of-subscription-apps/)). Monetize via **transactions, affiliate, referral marketplaces, and native ads** — monetization is a *component type* the model can render, not a paywall.
-3. **Hindi + English + Telugu at launch.** Accept messy code-mixed input (Hinglish, romanized Telugu, any script). Output language is an explicit user setting — Indic preference is strongest on the *output* side (98% consume in Indic languages; only ~19% search in them — [IAMAI-Kantar ICUBE 2024](https://www.iamai.in/sites/default/files/research/Kantar_%20IAMAI%20report_2024_.pdf)).
+3. **Hindi + English at launch; Telugu in phase 2** (descoped 2026-07-09 to cut v1 surface — one script system and one ASR/TTS pair fewer). Accept messy code-mixed input (Hinglish, any script). Output language is an explicit user setting — Indic preference is strongest on the *output* side (98% consume in Indic languages; only ~19% search in them — [IAMAI-Kantar ICUBE 2024](https://www.iamai.in/sites/default/files/research/Kantar_%20IAMAI%20report_2024_.pdf)). Caution: Telugu was the forcing function that kept the i18n architecture honest (non-Devanagari path) — build templates, line-height tokens, and the renderer script-agnostic anyway so Telugu lands without rework.
 4. **Voice in → visual out, with a spoken caption.** Voice input is first-class (~140M voice users, 55% rural). The answer is a visual interface plus a one-line TTS caption ("Rajdhani 40 minute late chal rahi hai — details neeche"). Full spoken-answer mode is an accessibility setting and the phase-2 rural wedge, not the v1 center — full TTS narration would make us a voice assistant (Google's turf) and costs ~4–10× more per query than a caption.
 5. **Two-tier coverage, not 100 categories.** The LLM + web search + genUI handles the entire long tail generically from day one. **Six hero categories** get deep structured-data integrations and embedded actions. Frequency is the filter: daily-habit categories build retention; "plan a birthday" is a demo, not a habit.
 
 ## 3. Who it's for (v1)
 
-Urban + tier-2 Android users, 18–45, in the Hindi belt + Telugu states (AP/Telangana), who already use ChatGPT (India = OpenAI's #2 market, ~100M WAU) but still juggle 6 single-purpose apps for trains, scores, movies, panchang, weather. We replace the *lookup layer* of daily life, not their chat companion.
+Urban + tier-2 Android users, 18–45, in the Hindi belt (Telugu states AP/Telangana join in phase 2 with the Telugu launch), who already use ChatGPT (India = OpenAI's #2 market, ~100M WAU) but still juggle 6 single-purpose apps for trains, scores, movies, panchang, weather. We replace the *lookup layer* of daily life, not their chat companion.
 
 ## 4. Hero categories (v1) — ranked by frequency × data feasibility × monetization
 
@@ -55,10 +55,10 @@ Display free, ad-supported scores with a configurable lag buffer; no paid/premiu
 
 ## 5. Language & voice architecture
 
-- **Input:** any of hi/en/te in any script, code-mixed. Pipeline: ASR (voice) → language-ID + transliteration/normalization → intent.
+- **Input:** hi/en in any script, code-mixed (Telugu: phase 2). Pipeline: ASR (voice) → language-ID + transliteration/normalization → intent.
 - **ASR:** Sarvam Saarika — ₹30/audio-hour ⇒ ~₹0.05 per 6-sec query ([pricing](https://docs.sarvam.ai/api-reference-docs/pricing)). Fallback/self-host option: AI4Bharat IndicConformer-600M (MIT license, 22 languages, Hindi WER 13.2) when volume justifies GPU ops. Bhashini free tier is PoC-only — not a production plan.
 - **TTS caption:** Sarvam Bulbul — ₹15/10k chars ⇒ ~₹0.15 per ~100-char caption. Voices per output language.
-- **Output language:** explicit user setting (hi/en/te), independent of input language. All component templates + TTS voices localized in all three from day one — Telugu forces the non-Devanagari path early, which keeps the i18n architecture honest.
+- **Output language:** explicit user setting (hi/en; te added in phase 2), independent of input language. Component templates + TTS voices localized in both from day one. With Telugu deferred, the non-Devanagari discipline it enforced must be kept by policy: no hardcoded script assumptions in templates, tokens, or renderer (per-script line-height tokens stay in the theme).
 
 ## 6. Generative-UI architecture
 
@@ -95,8 +95,8 @@ Revenue side: India ad eCPMs are the weakest of major markets (banner worst; rew
 
 ## 9. v1 scope & milestones
 
-- **M0 (weeks 1–3) — Vertical slice:** Flutter app, A2UI renderer, 8 components, cricket + panchang + weather via real APIs, hi/en/te text input, Telugu output proving the i18n path. Success: 10 scripted queries render correct interactive answers < 4s.
-- **M1 (weeks 4–8) — Private beta:** voice in + TTS caption, all 6 hero categories (trains via deep-links), generic long-tail tier, output-language setting, basic analytics. 100 users, hi-belt + Telugu-state mix. Success: D7 retention > 20%, ≥3 sessions/week/user.
+- **M0 (weeks 1–3) — Vertical slice:** Flutter app, A2UI renderer, 8 components, cricket + panchang + weather via real APIs, hi/en text input, script-agnostic renderer verified (no Devanagari-only assumptions). Success: 10 scripted queries render correct interactive answers < 4s.
+- **M1 (weeks 4–8) — Private beta:** voice in + TTS caption, all 6 hero categories (trains via deep-links), generic long-tail tier, output-language setting, basic analytics. 100 users in the Hindi belt. Success: D7 retention > 20%, ≥3 sessions/week/user.
 - **M2 (weeks 9–14) — Monetization + launch prep:** consult-referral + affiliate + UPI deep-link components live, native-ad slot, TIES application filed in parallel (DPIIT recognition first), cricket legal opinion obtained, TMDB commercial agreement signed. Success: ≥1 action per 3 sessions; revenue per DAU measurable.
 - **North-star metric:** weekly answer-sessions per user with an action taken.
 

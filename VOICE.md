@@ -1,6 +1,6 @@
 # TimePass — Verbal Identity: "The Itminaan Voice"
 
-**Date:** 2026-07-09 · Rung 2 of the brand ladder: who the product is when it talks. Sits under `BRAND_STRATEGY.md` (positioning + the four pillars) and feeds the caption LLM prompt, all UI copy, the store listing, and TTS voice casting. For TimePass, voice is not garnish — the product literally speaks (TTS captions in hi/en/te), so **the words are as much the interface as the pixels.**
+**Date:** 2026-07-09 · Rung 2 of the brand ladder: who the product is when it talks. Sits under `BRAND_STRATEGY.md` (positioning + the four pillars) and feeds the caption LLM prompt, all UI copy, the store listing, and TTS voice casting. For TimePass, voice is not garnish — the product literally speaks (TTS captions in hi/en at launch; te in phase 2), so **the words are as much the interface as the pixels.**
 
 ---
 
@@ -35,9 +35,9 @@ Cards speak in display register: numbers, labels, timestamps, zero personality. 
 
 But Amitabh himself is the wrong *primary* anchor: his register is formal gravitas (reads heavy for an 18–45 daily utility), his endorsement ubiquity dilutes the signal, and his persona is authority-from-above — we want authority-from-beside (the capable neighbor, not the patriarch).
 
-### 1.4 Telugu anchor (proposal — needs native validation)
+### 1.4 Telugu anchor (phase 2 — Telugu descoped from first launch, 2026-07-09)
 
-The pillars must not read as "translated Hindi warmth." Proposed Telugu warmth anchor: **S. P. Balasubrahmanyam's speaking register** — the most universally loved warm Telugu voice, gentle authority, zero condescension. Flag: chosen from general knowledge, not this run's research; a native Telugu speaker must validate the anchor and the sample copy (§8) before M1. The requirement it encodes either way: respectful-warm Telugu (*mee* register), conversational rather than Sanskritized-formal, and never a Hindi sentence shape wearing Telugu words.
+Telugu is out of v1; launch languages are Hindi + English. The proposal stands for when it returns: the pillars must not read as "translated Hindi warmth." Proposed Telugu warmth anchor: **S. P. Balasubrahmanyam's speaking register** — the most universally loved warm Telugu voice, gentle authority, zero condescension. Flag: chosen from general knowledge, not this run's research; a native Telugu speaker must validate the anchor and author (not translate) the Telugu reference set before the Telugu launch. The requirement it encodes either way: respectful-warm Telugu (*mee* register), conversational rather than Sanskritized-formal, and never a Hindi sentence shape wearing Telugu words.
 
 ### 1.5 Legal line
 
@@ -79,10 +79,10 @@ Rule of thumb: **the worse the news, the quieter the voice.** Humor and bad news
 
 ## 5. Language & register rules
 
-- **Mirror the user's mix.** Hinglish in → Hinglish out (in the user's script preference); pure Hindi in → pure Hindi out; same for Telugu. Code-mixing is rendered as people speak it, not as a textbook translates it.
+- **Mirror the user's mix.** Hinglish in → Hinglish out (in the user's script preference); pure Hindi in → pure Hindi out (same rule extends to Telugu in phase 2). Code-mixing is rendered as people speak it, not as a textbook translates it.
 - **Hindi:** conversational Hindustani, not shuddh Hindi. "Baarish" not "varsha". Aap-register by default.
 - **English:** Indian English, warm and plain. "Your train is 40 minutes late" — not Americanized casual, not babu-formal.
-- **Telugu:** mee-register, conversational; every string written *in* Telugu, not translated *into* it (§1.4 anchor + native review gate).
+- **Telugu (phase 2):** mee-register, conversational; every string written *in* Telugu, not translated *into* it (§1.4 anchor + native review gate).
 - **Indic rendering constraints** from `DESIGN.md` hold for copy too: no case-transforms on content, hierarchy via size/color — copy must never rely on bold/caps for emphasis.
 - **TTS casting brief (per language):** a voice that *sounds like the anchor register* — mid-pitch, unhurried, smiling-but-not-laughing. Cast per language from Sarvam Bulbul's voice options against this brief; never one "brand voice" accent forced across languages.
 
@@ -128,7 +128,7 @@ Reference examples matter more than rules (writers and models calibrate on them)
 
 ## 9. Open questions
 
-1. **Telugu validation** (blocking for M1): native review of the SPB anchor proposal + authoring (not translating) the te reference set.
+1. **Telugu validation** (phase 2 — no longer blocking M1): native review of the SPB anchor proposal + authoring (not translating) the te reference set, before the Telugu launch.
 2. **Name test in beta**: run the §6 rename triggers alongside the category-comprehension question.
 3. **TTS casting**: audition Sarvam Bulbul voices per language against the §5 brief; the chosen voices become part of this spec.
 4. **Voice drift check**: once the caption LLM prompt ships, sample 50 real captions/week against §3 banned list + §4 table — the itminaan voice is easy to spec and easy to lose.

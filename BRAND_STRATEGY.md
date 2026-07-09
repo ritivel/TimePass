@@ -33,9 +33,9 @@ CRED's lesson applies structurally (create the category, set the terms) but its 
 
 ## 3. Positioning statement
 
-> **For** Android users (18–45) in the Hindi belt and Telugu states who juggle half a dozen single-purpose apps for the daily lookups of Indian life —
+> **For** Android users (18–45) in the Hindi belt who juggle half a dozen single-purpose apps for the daily lookups of Indian life —
 > **TimePass is the daily answer app** —
-> **that** turns one question, spoken or typed in Hindi, English, or Telugu, into a live visual answer with the next action (book, pay, consult, order) built in —
+> **that** turns one question, spoken or typed in Hindi or English (Telugu: phase 2), into a live visual answer with the next action (book, pay, consult, order) built in —
 > **unlike** chatbots, which answer everything in walls of text and leave the job unfinished, and single-purpose apps, which each do one thing and demand you remember six of them —
 > **because** it renders real licensed Indian data (live scores, panchang, trains, IMD weather) as instant interactive cards, in your language, in under two seconds.
 
@@ -50,7 +50,7 @@ CRED's lesson applies structurally (create the category, set the terms) but its 
 Every positioning claim must be checkable in the first session:
 
 1. **"One question, done"** → embedded action card visible in the first answer (even v1 deep-links count).
-2. **"In your language"** → voice in Hinglish/Telugu works on messy code-mixed input; output-language setting is discoverable.
+2. **"In your language"** → voice in Hinglish works on messy code-mixed input; output-language setting is discoverable. (The claim widens to Telugu in phase 2.)
 3. **"Live, real"** → source chip + freshness timestamp on every data card (this is a *positioning* feature, not just a trust feature — it's what free chatbots visibly lack).
 4. **"Faster than the app you'd have opened"** → < 2s to visible answer. The claim self-destructs if latency slips; speed SLO is brand infrastructure.
 
@@ -60,7 +60,7 @@ Every positioning claim must be checkable in the first session:
 2. **Don't fight on intelligence.** Never benchmark against ChatGPT/Gemini in messaging. Our sentence: "faster than chat for lookups, and it finishes the job" (spec §8).
 3. **Don't claim breadth before trust.** No "everything app" language at launch. Six heroes deep, long tail quiet.
 4. **Don't gate or premium-ize.** No exclusivity mechanics, no paywalls (spec principle #2). The brand is calm-for-everyone; scarcity plays against it.
-5. **Don't wear the flag.** Indian-*ness* is expressed through competence (panchang correctness, cricket idiom, native-reading Telugu), never through sovereignty rhetoric.
+5. **Don't wear the flag.** Indian-*ness* is expressed through competence (panchang correctness, cricket idiom, Hindi that reads native — Telugu likewise when it ships), never through sovereignty rhetoric.
 
 # B. Product feel — the perception the behavior must earn
 
@@ -85,7 +85,7 @@ The words a user should reach for, each with the behaviors that manufacture it a
 *"It looks official. I'd act on it."* The answer carries the register of a scoreboard or station board: biggest type is the data, explicit labels, 1–2 real sources (five citations are NOT more trusted than one — AAAI-25 RCT), visible freshness timestamp. This resolves Quiet Interface vs. India's density-trust research: **calm shell, full answers** — density-with-hierarchy lives inside the card, quiet lives in the chrome. Nothing important behind menus or gestures (the ixigo 400× lesson). **Screenshot rule:** every card must survive as a WhatsApp forward — self-labeled, sourced, timestamped, action visible. **Anti-behavior:** hedge-words in data cards, unlabeled numbers, sources that don't support the answer.
 
 ### 8.3 Apna — ours; it speaks my language, knows my life
-*"It gets India. It gets me."* Warmth lives in **content, never chrome** (the `DESIGN.md` color rule, extended to voice). Code-mixed captions ("Rajdhani 40 minute late chal rahi hai") do personality work. Cultural literacy as competence: festivals on the panchang, cricket in cricket idiom, hi/te output that reads native, soft-3D art of Indian objects. Zomato-level wit, **rationed**: captions, empty states, celebrations — never in the data, never when the news is bad. **Anti-behavior:** translationese; humor colliding with a delayed train or bad-AQI day.
+*"It gets India. It gets me."* Warmth lives in **content, never chrome** (the `DESIGN.md` color rule, extended to voice). Code-mixed captions ("Rajdhani 40 minute late chal rahi hai") do personality work. Cultural literacy as competence: festivals on the panchang, cricket in cricket idiom, Hindi output that reads native (Telugu joins in phase 2), soft-3D art of Indian objects. Zomato-level wit, **rationed**: captions, empty states, celebrations — never in the data, never when the news is bad. **Anti-behavior:** translationese; humor colliding with a delayed train or bad-AQI day.
 
 ### 8.4 Kaam ho gaya — the job got done
 *"I didn't just learn the answer. I finished the task."* Sessions end like a *tool being put down*, not a conversation trailing off. The action card (consult, booking, UPI, cart) must feel like the natural last step of the answer, not an ad — the feel and the business model are the same thing (north-star metric: answer-sessions with an action taken). Quiet confirmed state, never a celebration screen. **Anti-behavior:** engagement-bait follow-ups, re-open nudges. We're the lookup layer; respecting the exit *is* the retention strategy.
@@ -96,7 +96,7 @@ Apply to every new component, flow, or copy string. A "no" on any line is a bloc
 
 1. **Turant** — Something meaningful renders < 2s? No motion delays content?
 2. **Bharosemand** — Biggest type is the data? Labels explicit? Source + freshness visible? Survives as a WhatsApp screenshot?
-3. **Apna** — Caption reads native in hi/te/en? Humor contextually safe? Warmth in content, not chrome?
+3. **Apna** — Caption reads native in hi/en (te in phase 2)? Humor contextually safe? Warmth in content, not chrome?
 4. **Kaam ho gaya** — Next action visible without digging? Session ends cleanly?
 
 # C. Playbook, messaging, risks
