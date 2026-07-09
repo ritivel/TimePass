@@ -24,6 +24,10 @@ from .base import Chunk, Final, Provider, Source, Turn
 log = logging.getLogger(__name__)
 
 MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite")
+# 503 UNAVAILABLE ("high demand") is Google-side capacity, not rate limiting —
+# no tier eliminates it. Flash sits in a separate capacity pool from
+# Flash-Lite, so it makes a cheap failures-only fallback (PROGRESS.md).
+FALLBACK_MODEL = os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
 
 
 def _extract_sources(candidates) -> list[Source]:
@@ -72,18 +76,24 @@ class GeminiProvider(Provider):
             config["response_mime_type"] = "application/json"
         return config
 
+    # 5xx recovery ladder: retry the primary after a short backoff (spikes
+    # usually clear in seconds), then try the fallback model once.
+    _ATTEMPTS = ((MODEL, 0.0), (MODEL, 1.5), (FALLBACK_MODEL, 0.0))
+
     async def stream(
         self, system: str, turns: list[Turn], *, grounded: bool = True
     ) -> AsyncIterator[Chunk | Final]:
         from google.genai import errors as genai_errors
 
         client = self._client()
-        for attempt in range(2):
+        for attempt, (model, backoff) in enumerate(self._ATTEMPTS):
             try:
+                if backoff:
+                    await asyncio.sleep(backoff)
                 buffer = ""
                 candidates = []
                 stream = await client.aio.models.generate_content_stream(
-                    model=MODEL,
+                    model=model,
                     contents=self._contents(turns),
                     config=self._config(system, grounded),
                 )
@@ -96,21 +106,32 @@ class GeminiProvider(Provider):
                 yield Final(buffer, _extract_sources(candidates))
                 return
             except genai_errors.ServerError:
-                # 5xx "high demand" spikes are common on the free tier and
-                # usually clear in seconds.
-                if attempt == 0:
-                    log.info("Gemini 5xx, retrying once after backoff")
-                    await asyncio.sleep(1.5)
+                if attempt + 1 < len(self._ATTEMPTS):
+                    next_model = self._ATTEMPTS[attempt + 1][0]
+                    log.info("Gemini 5xx on %s, retrying via %s", model, next_model)
                     continue
                 raise
 
     async def complete(
         self, system: str, turns: list[Turn], *, grounded: bool = False
     ) -> Final:
+        from google.genai import errors as genai_errors
+
         client = self._client()
-        response = await client.aio.models.generate_content(
-            model=MODEL,
-            contents=self._contents(turns),
-            config=self._config(system, grounded),
-        )
-        return Final(response.text or "", _extract_sources(response.candidates))
+        for attempt, (model, backoff) in enumerate(self._ATTEMPTS):
+            try:
+                if backoff:
+                    await asyncio.sleep(backoff)
+                response = await client.aio.models.generate_content(
+                    model=model,
+                    contents=self._contents(turns),
+                    config=self._config(system, grounded),
+                )
+                return Final(response.text or "", _extract_sources(response.candidates))
+            except genai_errors.ServerError:
+                if attempt + 1 < len(self._ATTEMPTS):
+                    next_model = self._ATTEMPTS[attempt + 1][0]
+                    log.info("Gemini 5xx on %s, retrying via %s", model, next_model)
+                    continue
+                raise
+        raise RuntimeError("unreachable")

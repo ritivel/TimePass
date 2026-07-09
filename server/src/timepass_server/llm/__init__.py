@@ -22,6 +22,7 @@ from typing import Any
 
 from .. import a2ui
 from ..a2ui import flatten_components
+from ..adapters import aqi, cricket, panchang, weather
 from ..validator import SurfaceValidationError, catalog_id, known_props, validate_surface
 from .base import Chunk, Final, Provider, Source, Turn
 from .gemini import GeminiProvider
@@ -44,7 +45,33 @@ Use Google Search ONLY when the answer depends on current or recent
 information (live prices, rates, news, schedules, results). For timeless
 questions — explanations, how-tos, letters, plans, comparisons of stable
 things — answer directly with the JSON, without searching.
+If the answer would be wrong or misleading without current real-world data
+(today's prices, tariffs or plan rates, news, schedules, availability) and
+you cannot search, respond with EXACTLY {"needsSearch": true} and nothing
+else — the server will re-ask you with search enabled. Never use it for
+timeless questions.
+The server also holds live Indian utility data. If the question is about one
+of these topics — however it is phrased, in any language — respond with
+EXACTLY {"needsData": {"source": "<name>"}} and nothing else; the server
+fetches the data and re-asks you with it:
+- "aqi": city air quality / pollution levels (CPCB, all-India)
+- "weather": city weather and forecast
+- "panchang": tithi, nakshatra, muhurat, rahu kalam for a date
+- "cricket": the live cricket match score
+Prefer needsData over needsSearch for these topics.
 """
+
+# Second phase of the needsData flow: compose the surface from adapter data.
+# The data is placed in the surface dataModel under /{source} so hero
+# components bind to it (catalog rule 6) instead of copying values.
+_COMPOSE_FROM_DATA = (
+    "The user asked: {query}\n\n"
+    'The server fetched live "{source}" data. This exact JSON is already '
+    'available in the surface dataModel at "/{source}":\n---\n{data}\n---\n'
+    "Compose the answer surface from this data only. Bind component props "
+    'with {{"path": "/{source}/..."}} references where the data has the '
+    "value. Do not invent facts beyond this data."
+)
 
 # When the model grounds with search it answers in plain text and drops the
 # JSON contract — this second-phase prompt composes the surface from that
@@ -60,6 +87,48 @@ _COMPOSE_FROM_TEXT = (
 # of the stream within the first chunks — long before components finish.
 _CAPTION_RE = re.compile(r'"caption"\s*:\s*"((?:[^"\\]|\\.)*)"')
 
+# The ungrounded path's escape hatch: the model answers {"needsSearch": true}
+# when the answer needs current data it doesn't have, and the server re-runs
+# the query with search enabled. The gate stays server-owned — the model can
+# only *request* a search, never trigger one directly.
+_NEEDS_SEARCH_RE = re.compile(r'"needsSearch"\s*:\s*true')
+
+
+def _wants_search(text: str) -> bool:
+    return bool(_NEEDS_SEARCH_RE.search(text.strip()[:200]))
+
+
+# The unified data path: adapters the model can request by name (the server
+# executes — whitelisted here, never model-supplied code or URLs). Every
+# adapter is (query, lang) -> data dict and falls back to fixtures on error;
+# templates.py keys the hero data model by the same names.
+_DATA_SOURCES = {
+    "aqi": aqi.get_aqi,
+    "weather": weather.get_weather,
+    "panchang": panchang.get_daily_panchang,
+    "cricket": cricket.get_live_match,
+}
+
+
+def _data_request(text: str) -> str | None:
+    """Extracts the source name from a {"needsData": ...} reply, else None."""
+    head = text.strip()
+    if '"needsData"' not in head[:200]:
+        return None
+    start = head.find("{")
+    if start < 0:
+        return None
+    try:
+        payload, _ = json.JSONDecoder(strict=False).raw_decode(head[start:])
+    except json.JSONDecodeError:
+        return None
+    request = payload.get("needsData")
+    if isinstance(request, dict):
+        return str(request.get("source") or "") or None
+    if isinstance(request, str):
+        return request or None
+    return None
+
 # Server-side grounding gate. With the google_search tool present, Flash-Lite
 # searches for ~3/4 of queries regardless of prompt instructions (measured on
 # the eval set) — tripling latency and burning grounded-query quota. So the
@@ -70,6 +139,10 @@ _FRESHNESS_KEYWORDS = [
     "currently", "recent", "this year", "this week", "this month", "news",
     "price", "prices", "rate", "rates", "cost of", "how much is", "schedule",
     "when is", "results", "score", "update", "2025", "2026",
+    # commercial offers change monthly and the model answers stale ones
+    # confidently — ground them (known miss: "jio vs airtel plans under 300")
+    "recharge", "plans under", "plan under", "tariff", "data pack", "offers",
+    "रिचार्ज", "प्लान", "ऑफर", "రీఛార్జ్", "ప్లాన్", "ఆఫర్",
     "आज", "अभी", "कल", "ताज़ा", "ताजा", "कीमत", "भाव", "रेट", "इस साल",
     "इस हफ्ते", "खबर", "कब है", "कितना है",
     "నేడు", "ఇప్పుడు", "రేపు", "తాజా", "ధర", "రేటు", "ఈ సంవత్సరం",
@@ -125,6 +198,37 @@ def placeholder_components(lang: str) -> list[dict[str, Any]]:
         {"id": "root", "component": "Column", "children": ["thinking"]},
         {"id": "thinking", "component": "Text", "variant": "caption", "text": _THINKING[lang]},
     ]
+
+
+# Grounded preview: while the two-phase grounded flow runs (search answer →
+# compose pass, ~15s total), the phase-1 plain-text answer streams into this
+# Markdown surface via data-model updates, so the user reads the answer in
+# seconds and the composed surface is an upgrade, not the first paint.
+_PREVIEW_PATH = "groundedText"
+_PREVIEW_PUSH_CHARS = 120  # min new chars between updateDataModel pushes
+
+
+def _preview_components() -> list[dict[str, Any]]:
+    return [
+        {"id": "root", "component": "Column", "children": ["grounded_answer"]},
+        {"id": "grounded_answer", "component": "Markdown", "text": {"path": f"/{_PREVIEW_PATH}"}},
+    ]
+
+
+_SENTENCE_END_RE = re.compile(r"[.!?।]['\")”]?(?:\s|$)")
+
+
+def _first_sentence(text: str, limit: int = 160) -> str:
+    """Caption for a plain-text grounded answer: its first sentence, cleaned
+    of markdown syntax (the caption is spoken, not rendered)."""
+    plain = re.sub(r"[#*_`>|]+", " ", text)
+    plain = " ".join(plain.split())
+    match = _SENTENCE_END_RE.search(plain)
+    if match and match.end() <= limit:
+        return plain[: match.end()].strip()
+    if len(plain) <= limit:
+        return plain
+    return plain[:limit].rsplit(" ", 1)[0] + "…"
 
 
 def _fallback_surface(text: str, lang: str) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
@@ -228,6 +332,207 @@ def _turns(query: str, history: list[dict[str, str]]) -> list[Turn]:
     return turns
 
 
+class _GenState:
+    """Mutable result carried through the streaming passes (async generators
+    can't return values)."""
+
+    def __init__(self) -> None:
+        self.caption = ""
+        self.caption_sent = False
+        self.components: list[dict[str, Any]] | None = None
+        self.data_model: dict[str, Any] = {}
+        self.sources: list[Source] = []
+        self.grounded_text = ""  # phase-1 plain-text answer, if search ran
+        self.escalate = False  # ungrounded model requested a search
+        self.data_request: str | None = None  # model requested an adapter
+        self.hero_data: dict[str, Any] = {}  # fetched adapter data, keyed by source
+        self.repair_turns: list[Turn] | None = None  # prompt to replay on repair
+
+
+def _set_parsed(state: _GenState, text: str) -> None:
+    state.caption, state.components, state.data_model = _parse_and_validate(text)
+
+
+async def _fast_json_pass(
+    provider: Provider, system: str, turns: list[Turn],
+    state: _GenState, surface_id: str, lang: str, query: str,
+) -> AsyncIterator[str]:
+    """Ungrounded strict-JSON path (the common case, p50 ~5s)."""
+    buffer = ""
+    async for event in provider.stream(system, turns, grounded=False):
+        if isinstance(event, Chunk):
+            buffer += event.text
+            if not state.caption_sent:
+                match = _CAPTION_RE.search(buffer)
+                if match:
+                    state.caption = json.loads(f'"{match.group(1)}"')
+                    state.caption_sent = True
+                    yield a2ui.ndjson(a2ui.caption_message(surface_id, state.caption, lang))
+        elif isinstance(event, Final):
+            buffer = event.text
+            state.sources = event.sources
+    source = _data_request(buffer)
+    if source is not None:
+        if source in _DATA_SOURCES:
+            state.data_request = source
+        else:
+            # Unknown source — grounded search can answer anything current.
+            log.info("model requested unknown data source %r; escalating to search", source)
+            state.escalate = True
+        return
+    if _wants_search(buffer):
+        state.escalate = True
+        return
+    state.repair_turns = turns
+    try:
+        _set_parsed(state, buffer)
+    except json.JSONDecodeError:
+        if not buffer.strip():
+            raise
+        # JSON mode should prevent this, but if the model answered in prose
+        # anyway, compose a surface from it rather than failing.
+        log.info("ungrounded plain-text answer; running compose pass")
+        async for msg in _compose_pass(provider, system, query, buffer, state, surface_id, lang):
+            yield msg
+
+
+async def _grounded_pass(
+    provider: Provider, system: str, turns: list[Turn],
+    state: _GenState, surface_id: str, lang: str, query: str,
+) -> AsyncIterator[str]:
+    """Search-grounded path with a live preview.
+
+    When the model searches it drops the JSON contract and answers in plain
+    text; that text streams into a Markdown preview surface immediately
+    (caption from its first sentence, sources attached), then the compose
+    pass upgrades it to the full visual surface.
+    """
+    buffer = ""
+    preview_started = False
+    pushed_len = 0
+    async for event in provider.stream(system, turns, grounded=True):
+        if isinstance(event, Chunk):
+            buffer += event.text
+            head = buffer.lstrip()
+            if not head:
+                continue
+            if head.startswith(("{", "```")):
+                # JSON contract held — the model chose not to search.
+                if not state.caption_sent:
+                    match = _CAPTION_RE.search(buffer)
+                    if match:
+                        state.caption = json.loads(f'"{match.group(1)}"')
+                        state.caption_sent = True
+                        yield a2ui.ndjson(a2ui.caption_message(surface_id, state.caption, lang))
+                continue
+            # Plain text — the model searched. Stream it into the preview.
+            if not state.caption_sent:
+                caption = _first_sentence(head)
+                if _SENTENCE_END_RE.search(caption) or len(caption) >= 80:
+                    state.caption = caption
+                    state.caption_sent = True
+                    yield a2ui.ndjson(a2ui.caption_message(surface_id, state.caption, lang))
+            if not preview_started:
+                preview_started = True
+                pushed_len = len(head)
+                yield a2ui.ndjson(
+                    a2ui.update_data_model(surface_id, {_PREVIEW_PATH: head}),
+                    a2ui.update_components(surface_id, _preview_components()),
+                )
+            elif len(head) - pushed_len >= _PREVIEW_PUSH_CHARS:
+                pushed_len = len(head)
+                yield a2ui.ndjson(a2ui.update_data_model(surface_id, {_PREVIEW_PATH: head}))
+        elif isinstance(event, Final):
+            buffer = event.text
+            state.sources = event.sources
+
+    text = buffer.strip()
+    if not preview_started and text.startswith(("{", "```")):
+        if _wants_search(text):
+            raise ValueError("model requested search while search was enabled")
+        state.repair_turns = turns
+        _set_parsed(state, text)
+        return
+
+    if not text:
+        raise json.JSONDecodeError("empty grounded answer", "", 0)
+    state.grounded_text = text
+    if not state.caption_sent:
+        state.caption = _first_sentence(text)
+        state.caption_sent = True
+        yield a2ui.ndjson(a2ui.caption_message(surface_id, state.caption, lang))
+    # Complete preview: full text plus sources, so the user has the whole
+    # grounded answer (attributed) while the compose pass runs.
+    final_preview = [a2ui.update_data_model(surface_id, {_PREVIEW_PATH: text})]
+    if not preview_started:
+        final_preview.append(a2ui.update_components(surface_id, _preview_components()))
+    elif state.sources:
+        try:
+            final_preview.append(a2ui.update_components(
+                surface_id, _attach_sources(_preview_components(), state.sources)))
+        except SurfaceValidationError:
+            pass
+    yield a2ui.ndjson(*final_preview)
+
+    async for msg in _compose_pass(provider, system, query, text, state, surface_id, lang):
+        yield msg
+
+
+async def _data_pass(
+    provider: Provider, system: str, source: str,
+    state: _GenState, surface_id: str, lang: str, query: str,
+) -> AsyncIterator[str]:
+    """Unified data path: fetch the requested adapter's data, then compose a
+    surface from it. The data lands in the surface dataModel under /{source},
+    so the model binds hero components exactly like server templates do."""
+    log.info("model requested data source %r; fetching adapter", source)
+    data = await _DATA_SOURCES[source](query, lang)
+    state.hero_data = {source: data}
+    prompt = _COMPOSE_FROM_DATA.format(
+        query=query, source=source,
+        data=json.dumps(data, ensure_ascii=False)[:4000],
+    )
+    compose_turns = [Turn("user", prompt)]
+    state.repair_turns = compose_turns
+    buffer = ""
+    async for event in provider.stream(system, compose_turns, grounded=False):
+        if isinstance(event, Chunk):
+            buffer += event.text
+            if not state.caption_sent:
+                match = _CAPTION_RE.search(buffer)
+                if match:
+                    state.caption = json.loads(f'"{match.group(1)}"')
+                    state.caption_sent = True
+                    yield a2ui.ndjson(a2ui.caption_message(surface_id, state.caption, lang))
+        elif isinstance(event, Final):
+            buffer = event.text
+    _set_parsed(state, buffer)
+
+
+async def _compose_pass(
+    provider: Provider, system: str, query: str, answer: str,
+    state: _GenState, surface_id: str, lang: str,
+) -> AsyncIterator[str]:
+    """Second phase: compose the visual surface from a plain-text answer,
+    in strict JSON mode (search grounding forbids JSON mode, hence two-phase)."""
+    log.info("running compose pass over plain-text answer")
+    compose_turns = [Turn("user", _COMPOSE_FROM_TEXT.format(query=query, answer=answer[:4000]))]
+    state.repair_turns = compose_turns
+    buffer = ""
+    async for event in provider.stream(system, compose_turns, grounded=False):
+        if isinstance(event, Chunk):
+            buffer += event.text
+            if not state.caption_sent:
+                match = _CAPTION_RE.search(buffer)
+                if match:
+                    state.caption = json.loads(f'"{match.group(1)}"')
+                    state.caption_sent = True
+                    yield a2ui.ndjson(a2ui.caption_message(surface_id, state.caption, lang))
+        elif isinstance(event, Final):
+            buffer = event.text
+    _set_parsed(state, buffer)
+
+
 async def generate_generic_stream(
     query: str,
     lang: str,
@@ -238,11 +543,16 @@ async def generate_generic_stream(
 
     1. placeholder surface immediately (perceived latency ≈ 0)
     2. caption line as soon as it parses out of the model stream
-    3. validated final surface (+ grounding SourceChips), with one
+    3. for grounded queries: the phase-1 search answer as a live Markdown
+       preview (with sources) while the compose pass runs
+    4. validated final surface (+ grounding SourceChips), with one
        validation-feedback repair retry
 
-    Fail-closed is preserved: only the placeholder (static, ours) and a fully
-    validated surface ever reach the wire.
+    The ungrounded path may escalate to the grounded one when the model
+    answers {"needsSearch": true} (freshness-gate misses); the reverse never
+    happens. Fail-closed is preserved: only the placeholder, the Markdown
+    preview (our components, model text), and fully validated surfaces reach
+    the wire.
     """
     yield a2ui.ndjson(
         a2ui.create_surface(surface_id, catalog_id()),
@@ -262,82 +572,70 @@ async def generate_generic_stream(
 
     system = _system_prompt(lang)
     turns = _turns(query, history or [])
-
-    caption_sent = False
-    caption = ""
-    components: list[dict[str, Any]] | None = None
-    data_model: dict[str, Any] = {}
-    sources: list[Source] = []
+    state = _GenState()
 
     grounded = needs_freshness(query)
     try:
-        buffer = ""
-        async for event in provider.stream(system, turns, grounded=grounded):
-            if isinstance(event, Chunk):
-                buffer += event.text
-                if not caption_sent:
-                    match = _CAPTION_RE.search(buffer)
-                    if match:
-                        caption = json.loads(f'"{match.group(1)}"')
-                        caption_sent = True
-                        yield a2ui.ndjson(a2ui.caption_message(surface_id, caption, lang))
-            elif isinstance(event, Final):
-                sources = event.sources
-                buffer = event.text
-        try:
-            caption, components, data_model = _parse_and_validate(buffer)
-        except json.JSONDecodeError:
-            if not buffer.strip():
-                raise
-            # Grounded plain-text answer (search overrides the JSON contract):
-            # second pass composes the surface from it, in strict JSON mode.
-            log.info("grounded plain-text answer; running compose pass")
-            compose_turns = [
-                Turn("user", _COMPOSE_FROM_TEXT.format(query=query, answer=buffer[:4000]))
-            ]
-            buffer = ""
-            async for event in provider.stream(system, compose_turns, grounded=False):
-                if isinstance(event, Chunk):
-                    buffer += event.text
-                    if not caption_sent:
-                        match = _CAPTION_RE.search(buffer)
-                        if match:
-                            caption = json.loads(f'"{match.group(1)}"')
-                            caption_sent = True
-                            yield a2ui.ndjson(
-                                a2ui.caption_message(surface_id, caption, lang)
-                            )
-                elif isinstance(event, Final):
-                    buffer = event.text
-            caption, components, data_model = _parse_and_validate(buffer)
+        if not grounded:
+            async for msg in _fast_json_pass(provider, system, turns, state, surface_id, lang, query):
+                yield msg
+            if state.data_request:
+                async for msg in _data_pass(
+                    provider, system, state.data_request, state, surface_id, lang, query,
+                ):
+                    yield msg
+            elif state.escalate:
+                log.info("model requested search; escalating to grounded flow")
+                grounded = True
+        if grounded and state.components is None:
+            async for msg in _grounded_pass(provider, system, turns, state, surface_id, lang, query):
+                yield msg
     except SurfaceValidationError as first:
-        # Repair loop: one retry with the validation errors as feedback.
+        # Repair loop: one retry with the validation errors as feedback,
+        # replayed against whichever prompt produced the invalid output.
         log.info("generic tier invalid, retrying with feedback: %s", first.errors[:3])
+        base = state.repair_turns or turns
         feedback = (
-            f"{query}\n\n[system] Your previous response failed catalog "
+            f"{base[-1].text}\n\n[system] Your previous response failed catalog "
             f"validation with these errors:\n- " + "\n- ".join(first.errors[:10]) +
             "\nRespond again with a corrected JSON object that satisfies the catalog."
         )
         try:
-            final = await provider.complete(system, [*turns[:-1], Turn("user", feedback)])
-            caption, components, data_model = _parse_and_validate(final.text)
+            final = await provider.complete(system, [*base[:-1], Turn("user", feedback)])
+            _set_parsed(state, final.text)
         except Exception:
             log.warning("generic tier invalid after retry, degrading")
-            caption, components, data_model = _fallback_surface(_DEGRADE_TEXT[lang], lang)
-            sources = []
+            _degrade(state, lang)
     except Exception:
         log.exception("generic tier failed, degrading to text surface")
-        caption, components, data_model = _fallback_surface(_DEGRADE_TEXT[lang], lang)
-        sources = []
+        _degrade(state, lang)
 
     try:
-        components = _attach_sources(components, sources)
+        state.components = _attach_sources(state.components, state.sources)
     except SurfaceValidationError:
         log.warning("source attachment failed validation; shipping without sources")
 
+    if state.hero_data:
+        # Adapter data underpins the surface's {path} bindings — merge it in
+        # whichever way the surface was produced (compose, repair, degrade).
+        state.data_model = {**state.hero_data, **state.data_model}
+
     messages: list[dict[str, Any]] = []
-    if not caption_sent:
-        messages.append(a2ui.caption_message(surface_id, caption, lang))
-    messages.append(a2ui.update_data_model(surface_id, data_model))
-    messages.append(a2ui.update_components(surface_id, components))
+    if not state.caption_sent:
+        messages.append(a2ui.caption_message(surface_id, state.caption, lang))
+    messages.append(a2ui.update_data_model(surface_id, state.data_model))
+    messages.append(a2ui.update_components(surface_id, state.components))
     yield a2ui.ndjson(*messages)
+
+
+def _degrade(state: _GenState, lang: str) -> None:
+    """Last resort — but if the grounded phase already produced a good
+    plain-text answer, keep it (with sources) instead of an apology."""
+    if state.grounded_text:
+        log.info("compose failed; finalizing the grounded preview as the answer")
+        state.caption, state.components, state.data_model = _fallback_surface(
+            state.grounded_text, lang)
+    else:
+        state.caption, state.components, state.data_model = _fallback_surface(
+            _DEGRADE_TEXT[lang], lang)
+        state.sources = []
