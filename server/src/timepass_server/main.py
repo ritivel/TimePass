@@ -19,12 +19,12 @@ import time
 import uuid
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import a2ui, llm, templates
+from . import a2ui, llm, templates, voice
 from .adapters import aqi, cricket, panchang, weather
 from .router import Category, route
 from .validator import SurfaceValidationError, catalog_id, validate_surface
@@ -149,6 +149,44 @@ async def live(surface_id: str) -> StreamingResponse:
             _live_surfaces.pop(surface_id, None)
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+# ── voice (Sarvam) ──────────────────────────────────────────────────────────
+
+
+class TtsRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=2500)
+    lang: Literal["en", "hi", "te"] = "en"
+
+
+@app.post("/v1/asr")
+async def asr(file: UploadFile) -> dict:
+    """Spoken query (≤30s wav/mp3/aac/flac/ogg) → {"transcript", "lang"}.
+
+    Language is auto-detected by Saaras, so the app can route the query in
+    whatever language was spoken.
+    """
+    if not voice.available():
+        raise HTTPException(status_code=503, detail="voice not configured")
+    audio = await file.read()
+    if not audio:
+        raise HTTPException(status_code=400, detail="empty audio")
+    try:
+        return await voice.transcribe(audio, file.content_type or "audio/wav")
+    except voice.VoiceError as e:
+        raise HTTPException(status_code=502, detail=e.detail) from e
+
+
+@app.post("/v1/tts")
+async def tts(req: TtsRequest) -> Response:
+    """Caption text → spoken audio (WAV)."""
+    if not voice.available():
+        raise HTTPException(status_code=503, detail="voice not configured")
+    try:
+        wav = await voice.synthesize(req.text, req.lang)
+    except voice.VoiceError as e:
+        raise HTTPException(status_code=502, detail=e.detail) from e
+    return Response(content=wav, media_type="audio/wav")
 
 
 @app.get("/", response_class=PlainTextResponse)

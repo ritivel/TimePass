@@ -5,9 +5,15 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:audioplayers/audioplayers.dart';
+import 'package:cross_file/cross_file.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:genui/genui.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/orchestrator_client.dart';
@@ -84,7 +90,11 @@ class _AnswerScreenState extends State<AnswerScreen> {
   final _scroll = ScrollController();
   final List<_Answer> _answers = [];
   final Map<String, StreamSubscription<A2uiMessage>> _liveSubs = {};
+  final _recorder = AudioRecorder();
+  final _player = AudioPlayer();
   String _lang = 'en';
+  bool _recording = false;
+  bool _transcribing = false;
 
   @override
   void initState() {
@@ -113,7 +123,72 @@ class _AnswerScreenState extends State<AnswerScreen> {
     _client.dispose();
     _input.dispose();
     _scroll.dispose();
+    _recorder.dispose();
+    _player.dispose();
     super.dispose();
+  }
+
+  // ── voice ────────────────────────────────────────────────────────────────
+
+  /// Tap to record, tap again to stop → transcribe → send. The spoken
+  /// language is auto-detected server-side, so a Telugu question gets a
+  /// Telugu answer regardless of the language picker.
+  Future<void> _toggleMic() async {
+    if (_recording) {
+      final path = await _recorder.stop();
+      setState(() {
+        _recording = false;
+        _transcribing = true;
+      });
+      try {
+        if (path != null) {
+          // XFile reads both file paths (mobile/desktop) and blob URLs (web).
+          final bytes = await XFile(path).readAsBytes();
+          final result = await _client.transcribe(bytes);
+          if (result.transcript.isNotEmpty) {
+            setState(() => _lang = result.lang);
+            await _send(result.transcript, speak: true);
+          }
+        }
+      } catch (e) {
+        debugPrint('voice query failed: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Couldn't hear that — try again.")),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => _transcribing = false);
+      }
+      return;
+    }
+    if (!await _recorder.hasPermission()) return;
+    // On web the path is ignored (record returns a blob URL from stop()).
+    final path = kIsWeb
+        ? ''
+        : '${(await getTemporaryDirectory()).path}/timepass_query.wav';
+    await _recorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.wav,
+        sampleRate: 16000,
+        numChannels: 1,
+      ),
+      path: path,
+    );
+    setState(() => _recording = true);
+  }
+
+  /// Speaks a caption via server-side TTS. Best-effort: voice output must
+  /// never break the visual answer.
+  Future<void> _speakCaption(String caption) async {
+    if (caption.isEmpty) return;
+    try {
+      final bytes = await _client.synthesize(caption, _lang);
+      await _player.stop();
+      await _player.play(BytesSource(Uint8List.fromList(bytes)));
+    } catch (e) {
+      debugPrint('tts failed: $e');
+    }
   }
 
   // ── persistence ──────────────────────────────────────────────────────────
@@ -198,7 +273,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
     });
   }
 
-  Future<void> _send(String query) async {
+  Future<void> _send(String query, {bool speak = false}) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return;
     _input.clear();
@@ -234,7 +309,8 @@ class _AnswerScreenState extends State<AnswerScreen> {
       });
       if (result.live) _subscribeLive(answer);
       unawaited(_persistAnswers());
-      // TODO(M1): speak the caption via Sarvam Bulbul TTS.
+      // Spoken question → spoken answer.
+      if (speak) unawaited(_speakCaption(result.caption));
     } catch (e) {
       setState(() {
         answer.error = '$e';
@@ -283,6 +359,7 @@ class _AnswerScreenState extends State<AnswerScreen> {
                       answer: _answers[index],
                       controller: _controller,
                       onRetry: _send,
+                      onSpeak: _speakCaption,
                     ),
                   ),
           ),
@@ -297,7 +374,11 @@ class _AnswerScreenState extends State<AnswerScreen> {
                       onSubmitted: _send,
                       textInputAction: TextInputAction.send,
                       decoration: InputDecoration(
-                        hintText: 'Ask anything…',
+                        hintText: _recording
+                            ? 'Listening…'
+                            : _transcribing
+                                ? 'Transcribing…'
+                                : 'Ask anything…',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(24),
                         ),
@@ -307,6 +388,26 @@ class _AnswerScreenState extends State<AnswerScreen> {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  _transcribing
+                      ? const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        )
+                      : IconButton.filled(
+                          style: _recording
+                              ? IconButton.styleFrom(
+                                  backgroundColor:
+                                      Theme.of(context).colorScheme.error,
+                                )
+                              : null,
+                          icon: Icon(_recording ? Icons.stop : Icons.mic),
+                          onPressed: _toggleMic,
+                        ),
+                  const SizedBox(width: 4),
                   IconButton.filled(
                     icon: const Icon(Icons.arrow_upward),
                     onPressed: () => _send(_input.text),
@@ -326,11 +427,13 @@ class _AnswerTile extends StatelessWidget {
     required this.answer,
     required this.controller,
     required this.onRetry,
+    required this.onSpeak,
   });
 
   final _Answer answer;
   final SurfaceController controller;
   final void Function(String query) onRetry;
+  final void Function(String caption) onSpeak;
 
   @override
   Widget build(BuildContext context) {
@@ -393,8 +496,15 @@ class _AnswerTile extends StatelessWidget {
                     const SizedBox(width: 10),
                   ],
                   if (answer.caption.isNotEmpty) ...[
-                    const Icon(Icons.volume_up_outlined, size: 16),
-                    const SizedBox(width: 6),
+                    InkWell(
+                      onTap: () => onSpeak(answer.caption),
+                      borderRadius: BorderRadius.circular(12),
+                      child: const Padding(
+                        padding: EdgeInsets.all(4),
+                        child: Icon(Icons.volume_up_outlined, size: 16),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
                     Expanded(
                       child: Text(answer.caption, style: theme.bodySmall),
                     ),

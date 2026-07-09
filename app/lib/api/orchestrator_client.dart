@@ -92,6 +92,43 @@ class OrchestratorClient {
     return QueryResult(caption: caption, live: live);
   }
 
+  /// Transcribes a spoken query (wav bytes, ≤30s). Returns the transcript
+  /// and the auto-detected app language code (en/hi/te) — voice queries
+  /// don't need the language picker.
+  Future<({String transcript, String lang})> transcribe(List<int> wavBytes) async {
+    final request = http.MultipartRequest('POST', Uri.parse('$_baseUrl/v1/asr'))
+      ..files.add(http.MultipartFile.fromBytes(
+        'file',
+        wavBytes,
+        filename: 'query.wav',
+      ));
+    final response = await http.Response.fromStream(await _http.send(request));
+    if (response.statusCode != 200) {
+      throw http.ClientException(
+        'asr failed (${response.statusCode}): ${response.body}',
+        request.url,
+      );
+    }
+    final decoded = jsonDecode(response.body) as Map<String, Object?>;
+    return (
+      transcript: (decoded['transcript'] as String?) ?? '',
+      lang: (decoded['lang'] as String?) ?? 'en',
+    );
+  }
+
+  /// Synthesizes [text] into spoken audio (WAV bytes) via the server's TTS.
+  Future<List<int>> synthesize(String text, String lang) async {
+    final response = await _http.post(
+      Uri.parse('$_baseUrl/v1/tts'),
+      headers: {'content-type': 'application/json'},
+      body: jsonEncode({'text': text, 'lang': lang}),
+    );
+    if (response.statusCode != 200) {
+      throw http.ClientException('tts failed (${response.statusCode})');
+    }
+    return response.bodyBytes;
+  }
+
   /// Subscribes to live data-model refreshes for [surfaceId]. The stream
   /// closes when the server-side TTL expires. Cancel to unsubscribe.
   Stream<A2uiMessage> liveMessages(String surfaceId) async* {
