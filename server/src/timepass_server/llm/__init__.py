@@ -37,7 +37,8 @@ _LANG_NAME = {"en": "English", "hi": "Hindi", "te": "Telugu"}
 
 _OUTPUT_CONTRACT = """
 Respond with ONLY a JSON object — no prose, no markdown code fences — of the form:
-{"caption": "<one spoken sentence in the output language>",
+{"caption": "<one spoken sentence answering or summarizing for the user —
+ it is read aloud by TTS; never mention JSON, components, or the interface>",
  "components": [<flat A2UI component list, root Column with id "root">],
  "dataModel": {}}
 Never emit a SourceChips component — the server attaches sources itself.
