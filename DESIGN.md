@@ -16,24 +16,29 @@ What we took from the Monogram teardown (their homepage + in-app mockups, 2026-0
 
 ## Tokens (source of truth: `app/lib/theme/tp_theme.dart`)
 
+### Palette decision — "Monogram White" (2026-07-10)
+
+The shell now follows the supplied Monogram reference directly: **ink `#202124` · white · neutral gray**. Genda remains available for brand and semantic content, but no longer warms the page chrome. Utility **teal**, live **coral**, and **genda** stay reserved for generated answer content where color carries meaning.
+
 ### Color — `TpTokens` (light / dark)
 
 | Token | Light | Dark | Role |
 |---|---|---|---|
-| `bg` | `#FFFFFF` | `#0F0F10` | page |
-| `card` | `#FFFFFF` (soft shadow) | `#1B1B1D` | floating answer card, input pill |
-| `tile` | `#F4F4F2` | `#29292C` | inset gray cells: chips, notices, ball dots, sample tiles |
-| `bubble` | `#F1F1EF` | `#29292C` | the user's query bubble |
-| `ink` / `inkMuted` | `#17171A` / `#88888E` | `#F4F4F5` / `#9A9AA1` | text |
-| `action` / `onAction` | `#141416` / white | `#F4F4F5` / near-black | **the one chrome accent**: mic, buttons, checkboxes |
-| `link` | `#3B6FD4` | `#8FB0F2` | sources, external taps |
-| `signalGreen` / `signalRed` / `warnAmber` | `#2E9E44` / `#E0453A` / `#E8A13D` | lighter variants | **content semantics only** — boundaries/wickets, alerts, LIVE, rahu kalam |
+| `bg` | `#FFFFFF` | `#161310` | white page |
+| `card` | `#FFFFFF` (soft shadow) | `#211D17` | floating answer card, input pill |
+| `tile` | `#F4F5F5` | `#2C2820` | inset neutral cells: chips, notices, ball dots, sample tiles |
+| `bubble` | `#F1F2F2` | `#2C2820` | the user's query bubble |
+| `ink` / `inkMuted` | `#202124` / `#787B80` | `#F6F1E4` / `#A69E8F` | text |
+| `action` / `onAction` | `#050505` / white | `#F6F1E4` / near-black | **the one chrome accent**: mic, buttons, checkboxes |
+| `link` | `#2F7DE1` | `#7FB0F0` | sources, external taps |
+| `signalGreen` / `signalRed` / `warnAmber` | teal `#12A88A` / coral `#F06A4D` / genda `#F2B33D` | lighter variants | **content semantics only** — boundaries/wickets, alerts, LIVE, rahu kalam |
+| `brand` | `#F2B33D` | `#F5C25E` | genda brand accent: icon, splash, marketing, empty-state moments |
 | `shadow` | 8% black | 20% black | card + input-bar elevation |
 
 ### Type
 
 - **System stack everywhere** (Roboto + Noto Indic fallbacks): native feel, guaranteed hi/te legibility, zero asset weight. (The earlier Anek bundling was dropped with the Station Board direction; files removed, −4.4 MB.)
-- `display(size, weight:)` for large data — scores 22/w700, temps 34/w700, AQI 44/w700; slight negative letterspacing ≥24px.
+- `display(size, weight:)` for large data — scores 22/w700, temps 34/w700, AQI 44/w700; letter spacing stays 0 for cleaner cross-script rendering.
 - `sectionHeader()`: 16/w600 sentence case. `caption()`: 12.5 gray.
 - **Indic rules hold**: fixed line-heights (display 1.1–1.3, body 1.5), weight ceiling w700, hierarchy via size/color — never ultra bolds.
 
@@ -62,9 +67,10 @@ What we took from the Monogram teardown (their homepage + in-app mockups, 2026-0
 
 ## Shell rules (`app/lib/main.dart`)
 
-- Wordmark: plain `TimePass` w700 — no marks, no color.
-- Input bar: one floating white pill (soft shadow) — borderless text field, muted send arrow, and the **black circular mic** as the primary control (red while recording).
-- Empty state: "Ask anything." + 2×2 grid of `SampleTile`s (generated soft-3D objects: cricket ball, sun-cloud, diya, leaf) firing hi/en sample queries (te returns in phase 2).
+- Home: sparse white canvas, two quiet utility controls, a large personal greeting, small action buttons, horizontally scrolling `Continue` cards, and compact `New ideas` rows.
+- Input dock: three floating controls—plus, the **black pill-shaped mic**, and keyboard—with the text field revealed only when typing starts.
+- Voice focus: recording/transcribing blurs the app behind a white full-screen listening surface; the mic morphs into an animated waveform and remains tap-to-stop.
+- Answers: after a query, generated A2UI surfaces appear below the shell and keep their own rich components, captions, source chips, and follow-ups.
 - Errors: red-tinted tile, plain language, Retry.
 
 ## Asset pipeline (proven 2026-07-09, both generations)
@@ -77,7 +83,7 @@ Soft-3D objects (`assets/art/obj_*.webp`, 16–28 KB each) generated with **`gpt
 ## Still open (next design increments)
 
 1. **Per-category richness**: more soft-3D objects (train, rupee coin, movie clapper) as hero categories land.
-2. **Rive brand moment**: mic listening/speaking state (needs the Rive-on-Impeller spike on a low-end device).
+2. **On-device voice motion tune**: validate the waveform cadence and blur cost on a low-end Android device.
 3. **Stagger** entrance across sibling cards in one surface.
 4. **Streaming-Markdown shimmer** for the grounded preview.
 5. **Low-end device QA** — jank is invisible on flagships; test on a ₹8–12k phone.

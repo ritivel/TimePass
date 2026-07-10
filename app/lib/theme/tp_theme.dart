@@ -1,11 +1,12 @@
-// TimePass design tokens — "Quiet Interface" (Monogram-style).
+// TimePass design tokens — Monogram-inspired Quiet Interface.
 //
-// The chrome stays out of the way: white surfaces, one accent (near-black),
-// soft gray tiles with large radii and no borders, semibold sentence-case
-// section headers, gray secondary text. All color and delight comes from the
-// CONTENT — data, semantic colors (AQI bands, cricket balls, alerts) and
-// soft-3D imagery — never from the UI chrome. (Design evidence and the
-// Monogram teardown live in DESIGN_RESEARCH.md; rules in DESIGN.md.)
+// The chrome stays out of the way: white surfaces, one accent (near-black
+// ink), soft neutral tiles with large radii and no borders, semibold
+// sentence-case section headers, gray secondary text. The brand color is
+// genda (marigold) — identity moments only, never chrome. All other color
+// comes from the CONTENT — data, semantic colors (AQI bands, cricket balls,
+// alerts) and soft-3D imagery. (Palette decision + rules in DESIGN.md;
+// research trail in DESIGN_RESEARCH.md.)
 //
 // Type is the system stack (Roboto + Noto Indic fallbacks): native feel,
 // guaranteed hi/te legibility, zero asset weight. Indic rules still apply:
@@ -31,6 +32,7 @@ class TpTokens extends ThemeExtension<TpTokens> {
     required this.signalGreen,
     required this.signalRed,
     required this.warnAmber,
+    required this.brand,
     required this.shadow,
   });
 
@@ -57,42 +59,50 @@ class TpTokens extends ThemeExtension<TpTokens> {
   /// Sources and taps that leave the app.
   final Color link;
 
-  /// Content semantics only — never chrome.
+  /// Content semantics only — never chrome. Green duty is carried by
+  /// utility teal; red duty by live coral; amber duty by genda.
   final Color signalGreen;
   final Color signalRed;
   final Color warnAmber;
+
+  /// Brand genda (marigold) — identity moments: icon, splash, marketing,
+  /// empty-state accents. Same hue family as [warnAmber] so panchang tiles
+  /// and the brand mark rhyme; still never plain chrome.
+  final Color brand;
 
   final Color shadow;
 
   static const light = TpTokens(
     bg: Color(0xFFFFFFFF),
     card: Color(0xFFFFFFFF),
-    tile: Color(0xFFF4F4F2),
-    bubble: Color(0xFFF1F1EF),
-    ink: Color(0xFF17171A),
-    inkMuted: Color(0xFF88888E),
-    action: Color(0xFF141416),
+    tile: Color(0xFFF4F5F5),
+    bubble: Color(0xFFF1F2F2),
+    ink: Color(0xFF202124),
+    inkMuted: Color(0xFF787B80),
+    action: Color(0xFF050505),
     onAction: Color(0xFFFFFFFF),
-    link: Color(0xFF3B6FD4),
-    signalGreen: Color(0xFF2E9E44),
-    signalRed: Color(0xFFE0453A),
-    warnAmber: Color(0xFFE8A13D),
-    shadow: Color(0x14000000),
+    link: Color(0xFF2F7DE1),
+    signalGreen: Color(0xFF12A88A),
+    signalRed: Color(0xFFF06A4D),
+    warnAmber: Color(0xFFF2B33D),
+    brand: Color(0xFFF2B33D),
+    shadow: Color(0x16000000),
   );
 
   static const dark = TpTokens(
-    bg: Color(0xFF0F0F10),
-    card: Color(0xFF1B1B1D),
-    tile: Color(0xFF29292C),
-    bubble: Color(0xFF29292C),
-    ink: Color(0xFFF4F4F5),
-    inkMuted: Color(0xFF9A9AA1),
-    action: Color(0xFFF4F4F5),
+    bg: Color(0xFF161310),
+    card: Color(0xFF211D17),
+    tile: Color(0xFF2C2820),
+    bubble: Color(0xFF2C2820),
+    ink: Color(0xFFF6F1E4),
+    inkMuted: Color(0xFFA69E8F),
+    action: Color(0xFFF6F1E4),
     onAction: Color(0xFF141416),
-    link: Color(0xFF8FB0F2),
-    signalGreen: Color(0xFF57C46E),
-    signalRed: Color(0xFFF0655B),
-    warnAmber: Color(0xFFF0B45E),
+    link: Color(0xFF7FB0F0),
+    signalGreen: Color(0xFF3CC6A9),
+    signalRed: Color(0xFFF58A70),
+    warnAmber: Color(0xFFF5C25E),
+    brand: Color(0xFFF5C25E),
     shadow: Color(0x33000000),
   );
 
@@ -136,25 +146,21 @@ TextStyle display(
   FontWeight weight = FontWeight.w600,
   double height = 1.25,
   Color? color,
-}) =>
-    TextStyle(
-      fontSize: size,
-      fontWeight: weight,
-      height: height,
-      color: color,
-      letterSpacing: size >= 24 ? -0.5 : -0.2,
-    );
+}) => TextStyle(
+  fontSize: size,
+  fontWeight: weight,
+  height: height,
+  color: color,
+  letterSpacing: 0,
+);
 
 /// Section header: semibold, sentence case ("What you need").
 TextStyle sectionHeader(BuildContext context) =>
     display(16, weight: FontWeight.w600, height: 1.3, color: context.tp.ink);
 
 /// Small gray caption under tiles and data.
-TextStyle caption(BuildContext context) => TextStyle(
-      fontSize: 12.5,
-      height: 1.35,
-      color: context.tp.inkMuted,
-    );
+TextStyle caption(BuildContext context) =>
+    TextStyle(fontSize: 12.5, height: 1.35, color: context.tp.inkMuted);
 
 // ── theme ───────────────────────────────────────────────────────────────────
 
@@ -164,28 +170,40 @@ ThemeData tpTheme(Brightness brightness) {
   final scheme = ColorScheme.fromSeed(
     seedColor: t.ink,
     brightness: brightness,
-  ).copyWith(
-    primary: t.action,
-    surface: t.bg,
-    error: t.signalRed,
-  );
+  ).copyWith(primary: t.action, surface: t.bg, error: t.signalRed);
 
   const bodyHeight = 1.5;
   final textTheme = ThemeData(brightness: brightness).textTheme.copyWith(
-        displayMedium: display(40, weight: FontWeight.w700, height: 1.1, color: t.ink),
-        displaySmall: display(32, weight: FontWeight.w700, height: 1.15, color: t.ink),
-        headlineSmall: display(24, weight: FontWeight.w700, height: 1.2, color: t.ink),
-        titleMedium: display(16.5, height: 1.3, color: t.ink),
-        titleSmall: display(14, height: 1.3, color: t.ink),
-        bodyLarge: TextStyle(fontSize: 16, height: bodyHeight, color: t.ink),
-        bodyMedium: TextStyle(fontSize: 14.5, height: bodyHeight, color: t.ink),
-        bodySmall: TextStyle(fontSize: 12.5, height: 1.4, color: t.inkMuted),
-        labelSmall: TextStyle(
-            fontSize: 11.5,
-            height: 1.2,
-            fontWeight: FontWeight.w600,
-            color: t.inkMuted),
-      );
+    displayMedium: display(
+      40,
+      weight: FontWeight.w700,
+      height: 1.1,
+      color: t.ink,
+    ),
+    displaySmall: display(
+      32,
+      weight: FontWeight.w700,
+      height: 1.15,
+      color: t.ink,
+    ),
+    headlineSmall: display(
+      24,
+      weight: FontWeight.w700,
+      height: 1.2,
+      color: t.ink,
+    ),
+    titleMedium: display(16.5, height: 1.3, color: t.ink),
+    titleSmall: display(14, height: 1.3, color: t.ink),
+    bodyLarge: TextStyle(fontSize: 16, height: bodyHeight, color: t.ink),
+    bodyMedium: TextStyle(fontSize: 14.5, height: bodyHeight, color: t.ink),
+    bodySmall: TextStyle(fontSize: 12.5, height: 1.4, color: t.inkMuted),
+    labelSmall: TextStyle(
+      fontSize: 11.5,
+      height: 1.2,
+      fontWeight: FontWeight.w600,
+      color: t.inkMuted,
+    ),
+  );
 
   return ThemeData(
     useMaterial3: true,
@@ -214,7 +232,10 @@ ThemeData tpTheme(Brightness brightness) {
       elevation: 0,
       shape: const StadiumBorder(),
       labelStyle: TextStyle(
-          fontSize: 13.5, fontWeight: FontWeight.w500, color: t.ink),
+        fontSize: 13.5,
+        fontWeight: FontWeight.w500,
+        color: t.ink,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     ),
     dividerTheme: DividerThemeData(color: t.tile, thickness: 1),
