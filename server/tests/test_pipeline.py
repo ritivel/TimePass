@@ -161,6 +161,44 @@ def test_rejects_bad_prop_values():
         )
 
 
+def test_rejects_model_fabricated_button_urls():
+    with pytest.raises(SurfaceValidationError, match="literal URLs"):
+        validate_surface(
+            [
+                {
+                    "id": "root",
+                    "component": "Column",
+                    "children": ["label", "cta", "chips"],
+                },
+                {"id": "label", "component": "Text", "text": "Open this"},
+                {
+                    "id": "cta_label",
+                    "component": "Text",
+                    "text": "Search web",
+                },
+                {
+                    "id": "cta",
+                    "component": "Button",
+                    "child": "cta_label",
+                    "action": {
+                        "event": {
+                            "name": "open_url",
+                            "context": {"url": "https://example.com"},
+                        }
+                    },
+                },
+                {
+                    "id": "chips",
+                    "component": "FollowUpChips",
+                    "suggestions": [
+                        {"label": "More", "query": "tell me more"},
+                        {"label": "Shorter", "query": "make it shorter"},
+                    ],
+                },
+            ]
+        )
+
+
 def test_rejects_dangling_child_ref():
     with pytest.raises(SurfaceValidationError, match="does not exist"):
         validate_surface(

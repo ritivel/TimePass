@@ -17,30 +17,30 @@ protocol: "v0.9.1"
 # Model-facing composition rules — compiled verbatim into the system prompt.
 # Keep under ~600 tokens (COMPONENT_CATALOG.md §9).
 instructions: |
-  You compose answer surfaces from the components in this catalog. Rules:
-  1. The surface root is one Column with id "root". Order of its children:
-     optional Notice (compliance), 1-8 answer blocks, optional single action
-     component, optional SourceChips, optional AdSlot (never first), and
-     FollowUpChips last (include it by default with 2-4 suggestions).
-  2. Only Row, Column, Card, List have children; Card and Button take one child.
-     All other components are leaves — never put components inside them.
-  3. Limits: nesting depth <= 4, <= 40 components, Row <= 4 children,
-     <= 2 hero components, <= 1 action component per surface.
-  4. Hero components (CricketLiveScore, PanchangCard, WeatherStrip, AqiMeter)
-     are already cards — never wrap them in Card.
-  5. If CricketLiveScore is present, the root MUST start with
-     Notice(variant: legal) disclosing the score delay.
-  6. Bind hero data with {"path": "/..."} references into the data model the
-     server provides — do not copy data values into component props.
-  7. Every user-visible string must be in the requested output language.
-     Use Latin digits. Never invent URLs; only use server-provided link fields.
-  8. Prefer one coarse hero component over rebuilding it from primitives.
-     For prose answers (letters, explanations) use Markdown — cards are not
-     mandatory. For labeled facts use KeyValueGrid; for comparing options use
-     ComparisonTable; for remedies/steps/preparation use Checklist.
-  9. Be compact: aim for 3-6 components total (plus FollowUpChips). One good
-     Markdown or one ComparisonTable beats six stacked sections. Long answers
-     are slower and worse — say it once, visually.
+  Compose a visual answer mini-app, not a chat transcript. Rules:
+  1. Root is one Column with id "root". Order: optional compliance Notice,
+     1-8 answer blocks, optional single action component, optional SourceChips
+     or AdSlot, and FollowUpChips last (default 2-4 suggestions).
+  2. Pick a layout by intent: status/current data -> one hero plus next action;
+     compare/choose -> ComparisonTable plus a short recommendation; how-to,
+     recipe, packing, prep -> Checklist plus a compact why/notes block; plan
+     or trip -> KeyValueGrid for assumptions, Checklist for itinerary/tasks;
+     simple prose/draft -> Markdown only when a visual structure would be worse.
+  3. Give the user a useful first screen: answer the question immediately,
+     surface the most important number/choice/step, then expose drill-down
+     paths through FollowUpChips. Avoid long walls of Markdown.
+  4. Only Row, Column, Card, List have children; Card and Button take one child.
+     All other components are leaves. Limits: depth <= 4, <= 40 components,
+     Row <= 4 children, <= 2 hero components, <= 1 action component.
+  5. Hero components (CricketLiveScore, PanchangCard, WeatherStrip, AqiMeter)
+     are already cards — never wrap them in Card. If CricketLiveScore is
+     present, root MUST start with Notice(variant: legal) for score delay.
+  6. Bind hero data with {"path": "/..."} references into server dataModel.
+     Do not copy those values into props.
+  7. Every visible string must be in the requested output language. Use Latin
+     digits. Never invent URLs; only use server-provided link fields.
+  8. Be compact: aim for 3-6 components plus FollowUpChips. Prefer one strong
+     structured surface over many weak sections.
 
 components:
 

@@ -8,6 +8,7 @@ COMPONENT_CATALOG.md §5 that a JSON Schema can't express (R1, R3, R4, R6).
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,7 @@ HERO_COMPONENTS = {"CricketLiveScore", "PanchangCard", "WeatherStrip", "AqiMeter
 ACTION_COMPONENTS = {"UpiPayButton", "AffiliateCta", "ConsultReferralCard", "DeepLinkCard"}
 CONTAINER_CHILDREN = {"Row", "Column", "List"}
 CONTAINER_CHILD = {"Card", "Button"}
+URL_RE = re.compile(r"https?://|upi://|intent://", re.IGNORECASE)
 
 MAX_COMPONENTS = 40
 MAX_DEPTH = 4
@@ -112,6 +114,25 @@ def validate_surface(components: list[dict[str, Any]]) -> None:
             errors.append(f"unreachable components: {sorted(orphans)}")
 
     types = [c["component"] for c in components]
+
+    def carries_literal_url(value: Any) -> bool:
+        if isinstance(value, str):
+            return bool(URL_RE.search(value))
+        if isinstance(value, dict):
+            return any(carries_literal_url(v) for v in value.values())
+        if isinstance(value, list):
+            return any(carries_literal_url(v) for v in value)
+        return False
+
+    # M0 generic buttons are internal UI actions only. External/deep links are
+    # trusted surfaces: SourceChips (search metadata) or future server-issued
+    # action components with signed URLs. The model must not fabricate them.
+    for comp in components:
+        if comp["component"] == "Button" and carries_literal_url(comp.get("action")):
+            errors.append(
+                f"{comp['id']}: Button action cannot carry literal URLs; "
+                "use SourceChips or server-issued action components"
+            )
 
     # R4: hero limits
     hero_count = sum(1 for t in types if t in HERO_COMPONENTS)
