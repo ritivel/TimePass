@@ -5,6 +5,7 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 uv.lock
+!server/uv.lock
 
 # Flutter / Dart
 app/.dart_tool/
@@ -16,6 +17,8 @@ app/ios/Pods/
 
 # Generated artifacts (rebuilt by catalog/generator)
 catalog/dist/
+!catalog/dist/
+!catalog/dist/**
 
 # Secrets & local env
 .env

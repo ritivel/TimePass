@@ -1,4 +1,4 @@
-// TimePass design tokens — Monogram-inspired Quiet Interface.
+// Nakul design tokens — Monogram-inspired Quiet Interface.
 //
 // The chrome stays out of the way: white surfaces, one accent (near-black
 // ink), soft neutral tiles with large radii and no borders, semibold

@@ -1,0 +1,12 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), geolocation=(), microphone=(self), payment=()
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+/flutter_service_worker.js
+  Cache-Control: no-cache
+
+/index.html
+  Cache-Control: no-cache

@@ -44,7 +44,7 @@ def update_components(surface_id: str, components: list[dict[str, Any]]) -> dict
 def caption_message(
     surface_id: str, caption: str, lang: str, *, live: bool = False
 ) -> dict[str, Any]:
-    """TimePass extension line (not part of A2UI): the one-line TTS caption.
+    """Nakul extension line (not part of A2UI): the one-line TTS caption.
 
     The Flutter client reads this for the caption bar / TTS and must not feed
     it to the A2UI transport adapter. `live: true` tells the client to
@@ -53,7 +53,7 @@ def caption_message(
     ext: dict[str, Any] = {"surfaceId": surface_id, "caption": caption, "lang": lang}
     if live:
         ext["live"] = True
-    return {"timepass": ext}
+    return {"nakul": ext}
 
 
 def ndjson(*messages: dict[str, Any]) -> str:

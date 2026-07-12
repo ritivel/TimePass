@@ -1,0 +1,4 @@
+storePassword=replace-with-store-password
+keyPassword=replace-with-key-password
+keyAlias=nakul
+storeFile=/absolute/path/to/nakul-upload-keystore.jks

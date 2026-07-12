@@ -1,8 +1,8 @@
-"""TimePass orchestrator API.
+"""Nakul orchestrator API.
 
 POST /v1/query {query, lang?, surfaceId?} → NDJSON stream of A2UI messages
 (createSurface / updateDataModel / updateComponents) plus one app-level
-{"timepass": {caption, lang, surfaceId}} TTS-caption line.
+{"nakul": {caption, lang, surfaceId}} TTS-caption line.
 
 Hero categories are template-composed and adapter-fed (deterministic, cached,
 sent atomically). The generic tier streams progressively: placeholder surface
@@ -15,32 +15,91 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 import uuid
+from contextlib import asynccontextmanager
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 
-from . import a2ui, llm, templates, voice
+from . import a2ui, auth, llm, templates, visuals, voice
 from .adapters import aqi, cricket, panchang, weather
 from .router import Category, route
 from .validator import SurfaceValidationError, catalog_id, validate_surface
 
 logging.basicConfig(level=logging.INFO)
-log = logging.getLogger("timepass")
+log = logging.getLogger("nakul")
 
-app = FastAPI(title="TimePass Orchestrator", version="0.1.0")
 
-# Dev-only: Flutter web runs on a random localhost port. Lock down before beta.
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    missing = auth.missing_production_config()
+    if missing:
+        raise RuntimeError(
+            "Authenticated deployment is missing required configuration: "
+            + ", ".join(missing)
+        )
+    yield
+
+
+app = FastAPI(title="Nakul Orchestrator", version="0.1.0", lifespan=lifespan)
+
+_allowed_origins = [
+    origin.strip()
+    for origin in os.environ.get("NAKUL_ALLOWED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_allowed_origins,
+    # Flutter web uses a random localhost port during local development.
+    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
+    allow_headers=["authorization", "content-type", "x-request-id"],
+    expose_headers=["x-request-id"],
 )
+
+_request_id_pattern = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+
+
+@app.middleware("http")
+async def operational_headers(request: Request, call_next):
+    supplied_id = request.headers.get("x-request-id", "")
+    request_id = (
+        supplied_id
+        if _request_id_pattern.fullmatch(supplied_id)
+        else uuid.uuid4().hex
+    )
+    started = time.perf_counter()
+    try:
+        response = await call_next(request)
+    except Exception:
+        log.exception(
+            "request failed id=%s method=%s path=%s",
+            request_id,
+            request.method,
+            request.url.path,
+        )
+        raise
+    response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    if request.url.path.startswith("/v1/"):
+        response.headers.setdefault("Cache-Control", "no-store")
+    elapsed_ms = (time.perf_counter() - started) * 1000
+    log.info(
+        "request id=%s method=%s path=%s status=%d elapsed_ms=%.1f",
+        request_id,
+        request.method,
+        request.url.path,
+        response.status_code,
+        elapsed_ms,
+    )
+    return response
 
 
 class HistoryTurn(BaseModel):
@@ -58,11 +117,17 @@ class QueryRequest(BaseModel):
     history: list[HistoryTurn] = Field(default_factory=list, max_length=24)
 
 
-# Surfaces eligible for live refresh: surface_id -> (category, lang, expires_at).
+class VisualRequest(BaseModel):
+    prompt: str = Field(min_length=8, max_length=500)
+    aspectRatio: Literal["landscape", "square", "portrait"] = "landscape"
+
+
+# Surfaces eligible for live refresh:
+# surface_id -> (category, lang, expires_at, owner_id).
 # In-memory is fine for M0 (single process); a real deployment shares this.
 LIVE_TTL_SECONDS = int(os.environ.get("LIVE_TTL_SECONDS", "300"))
 LIVE_REFRESH_SECONDS = float(os.environ.get("LIVE_REFRESH_SECONDS", "8"))
-_live_surfaces: dict[str, tuple[str, str, float]] = {}
+_live_surfaces: dict[str, tuple[str, str, float, str]] = {}
 
 
 @app.get("/healthz")
@@ -71,10 +136,20 @@ async def healthz() -> dict:
 
 
 @app.post("/v1/query")
-async def query(req: QueryRequest) -> StreamingResponse:
+async def query(
+    req: QueryRequest,
+    user: auth.AuthenticatedUser = Depends(auth.require_user),
+) -> StreamingResponse:
+    await auth.enforce_query_quota(user)
     surface_id = req.surfaceId or f"s_{uuid.uuid4().hex[:12]}"
     category = route(req.query)
-    log.info("query lang=%s category=%s %r", req.lang, category.value, req.query[:80])
+    log.info(
+        "query user=%s lang=%s category=%s chars=%d",
+        user.id[:8],
+        req.lang,
+        category.value,
+        len(req.query),
+    )
 
     if category is Category.GENERIC:
         # Progressive: placeholder surface immediately, caption as soon as it
@@ -91,7 +166,12 @@ async def query(req: QueryRequest) -> StreamingResponse:
     if category is Category.CRICKET:
         data = await cricket.get_live_match(req.query, req.lang)
         caption, components, data_model = templates.cricket_surface(data, req.lang)
-        _live_surfaces[surface_id] = ("cricket", req.lang, time.monotonic() + LIVE_TTL_SECONDS)
+        _live_surfaces[surface_id] = (
+            "cricket",
+            req.lang,
+            time.monotonic() + LIVE_TTL_SECONDS,
+            user.id,
+        )
         live = True
     elif category is Category.PANCHANG:
         data = await panchang.get_daily_panchang(req.query, req.lang)
@@ -126,7 +206,10 @@ async def query(req: QueryRequest) -> StreamingResponse:
 
 
 @app.get("/v1/live/{surface_id}")
-async def live(surface_id: str) -> StreamingResponse:
+async def live(
+    surface_id: str,
+    user: auth.AuthenticatedUser = Depends(auth.require_user),
+) -> StreamingResponse:
     """Pushes updateDataModel refreshes for a live surface (NDJSON stream).
 
     The A2UI data-model bindings mean the client re-renders without any
@@ -136,7 +219,10 @@ async def live(surface_id: str) -> StreamingResponse:
     entry = _live_surfaces.get(surface_id)
     if entry is None:
         raise HTTPException(status_code=404, detail="not a live surface (or expired)")
-    category, lang, expires_at = entry
+    category, lang, expires_at, owner_id = entry
+    if owner_id != user.id:
+        # Avoid revealing whether another user's live surface exists.
+        raise HTTPException(status_code=404, detail="not a live surface (or expired)")
 
     async def stream():
         try:
@@ -160,7 +246,10 @@ class TtsRequest(BaseModel):
 
 
 @app.post("/v1/asr")
-async def asr(file: UploadFile) -> dict:
+async def asr(
+    file: UploadFile,
+    _user: auth.AuthenticatedUser = Depends(auth.require_user),
+) -> dict:
     """Spoken query (≤30s wav/mp3/aac/flac/ogg) → {"transcript", "lang"}.
 
     Language is auto-detected by Saaras, so the app can route the query in
@@ -171,6 +260,8 @@ async def asr(file: UploadFile) -> dict:
     audio = await file.read()
     if not audio:
         raise HTTPException(status_code=400, detail="empty audio")
+    if len(audio) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="audio file too large")
     try:
         return await voice.transcribe(audio, file.content_type or "audio/wav")
     except voice.VoiceError as e:
@@ -178,7 +269,10 @@ async def asr(file: UploadFile) -> dict:
 
 
 @app.post("/v1/tts")
-async def tts(req: TtsRequest) -> Response:
+async def tts(
+    req: TtsRequest,
+    _user: auth.AuthenticatedUser = Depends(auth.require_user),
+) -> Response:
     """Caption text → spoken audio (WAV)."""
     if not voice.available():
         raise HTTPException(status_code=503, detail="voice not configured")
@@ -189,6 +283,41 @@ async def tts(req: TtsRequest) -> Response:
     return Response(content=wav, media_type="audio/wav")
 
 
+@app.post("/v1/visual")
+async def visual(
+    req: VisualRequest,
+    _user: auth.AuthenticatedUser = Depends(auth.require_user),
+) -> Response:
+    """Generate one style-locked image used by a GeneratedVisual component."""
+    if not visuals.available():
+        raise HTTPException(status_code=503, detail="visual generation not configured")
+    try:
+        image, mime = await asyncio.wait_for(
+            visuals.generate(req.prompt, req.aspectRatio), timeout=75
+        )
+    except TimeoutError as e:
+        raise HTTPException(status_code=504, detail="visual generation timed out") from e
+    except visuals.VisualError as e:
+        raise HTTPException(status_code=502, detail=str(e)) from e
+    except Exception as e:
+        log.exception("visual generation failed")
+        raise HTTPException(status_code=502, detail="visual generation failed") from e
+    return Response(
+        content=image,
+        media_type=mime,
+        headers={"Cache-Control": "private, max-age=86400"},
+    )
+
+
+@app.delete("/v1/account", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_account(
+    user: auth.AuthenticatedUser = Depends(auth.require_user),
+) -> Response:
+    """Permanently delete the signed-in user and cascaded account data."""
+    await auth.delete_user(user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @app.get("/", response_class=PlainTextResponse)
 async def index() -> str:
-    return "TimePass orchestrator. POST /v1/query {query, lang}\n"
+    return "Nakul orchestrator. POST /v1/query {query, lang}\n"

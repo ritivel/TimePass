@@ -1,4 +1,4 @@
-package com.example.timepass_app
+package app.nakul.mobile
 
 import io.flutter.embedding.android.FlutterActivity
 

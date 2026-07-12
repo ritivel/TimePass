@@ -9,8 +9,8 @@ from types import SimpleNamespace
 
 from google.genai import errors as genai_errors
 
-from timepass_server.llm.base import Chunk, Final
-from timepass_server.llm.gemini import FALLBACK_MODEL, MODEL, GeminiProvider
+from nakul_server.llm.base import Chunk, Final
+from nakul_server.llm.gemini import FALLBACK_MODEL, MODEL, GeminiProvider
 
 
 def _server_error() -> genai_errors.ServerError:

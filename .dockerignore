@@ -1,0 +1,15 @@
+.git
+.gitignore
+app
+design
+field-notes
+output
+tmp
+server/.venv
+server/.pytest_cache
+server/__pycache__
+server/tests
+server/evals
+supabase
+*.png
+*.mp4

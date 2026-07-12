@@ -172,7 +172,7 @@ async def fetch_city_records(city: str) -> list[dict[str, Any]]:
     # hang to timeout); any explicit UA goes through in ~1s.
     async with httpx.AsyncClient(
         timeout=15,
-        headers={"User-Agent": "TimePass/0.1 (aqi-adapter)", "Accept": "application/json"},
+        headers={"User-Agent": "Nakul/0.1 (aqi-adapter)", "Accept": "application/json"},
     ) as client:
         last_error: Exception | None = None
         for attempt in range(2):  # gov endpoints drop the odd TLS handshake

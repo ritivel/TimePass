@@ -8,6 +8,7 @@ COMPONENT_CATALOG.md §5 that a JSON Schema can't express (R1, R3, R4, R6).
 from __future__ import annotations
 
 import json
+import os
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -15,7 +16,12 @@ from typing import Any
 
 import jsonschema
 
-CATALOG_PATH = Path(__file__).resolve().parents[3] / "catalog" / "dist" / "catalog.json"
+CATALOG_PATH = Path(
+    os.environ.get(
+        "NAKUL_CATALOG_PATH",
+        Path(__file__).resolve().parents[3] / "catalog" / "dist" / "catalog.json",
+    )
+)
 
 HERO_COMPONENTS = {"CricketLiveScore", "PanchangCard", "WeatherStrip", "AqiMeter"}
 ACTION_COMPONENTS = {"UpiPayButton", "AffiliateCta", "ConsultReferralCard", "DeepLinkCard"}
@@ -133,6 +139,13 @@ def validate_surface(components: list[dict[str, Any]]) -> None:
                 f"{comp['id']}: Button action cannot carry literal URLs; "
                 "use SourceChips or server-issued action components"
             )
+
+    generated_visuals = [c for c in components if c["component"] == "GeneratedVisual"]
+    if len(generated_visuals) > 1:
+        errors.append("at most one GeneratedVisual is allowed per surface")
+    for comp in generated_visuals:
+        if carries_literal_url(comp.get("prompt")):
+            errors.append(f"{comp['id']}: GeneratedVisual prompt cannot contain URLs")
 
     # R4: hero limits
     hero_count = sum(1 for t in types if t in HERO_COMPONENTS)

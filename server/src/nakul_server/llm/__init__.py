@@ -29,7 +29,12 @@ from .gemini import GeminiProvider
 
 log = logging.getLogger(__name__)
 
-PROMPT_PATH = Path(__file__).resolve().parents[4] / "catalog" / "dist" / "system_prompt.md"
+PROMPT_PATH = Path(
+    os.environ.get(
+        "NAKUL_SYSTEM_PROMPT_PATH",
+        Path(__file__).resolve().parents[4] / "catalog" / "dist" / "system_prompt.md",
+    )
+)
 
 _PROVIDERS: dict[str, Provider] = {"gemini": GeminiProvider()}
 
@@ -163,7 +168,7 @@ _THINKING = {
 
 _MOCK_TEXT = {
     "en": "This is a mock generic answer (no LLM provider configured). The real "
-          "generic tier sends your question to the model with the TimePass "
+          "generic tier sends your question to the model with the Nakul "
           "catalog and renders whatever it composes.",
     "hi": "यह एक मॉक जवाब है (कोई LLM प्रोवाइडर सेट नहीं है)। असली जेनेरिक टियर "
           "आपका सवाल मॉडल को भेजता है और जो UI बनता है उसे दिखाता है।",
@@ -275,7 +280,79 @@ def _normalize_component_shapes(components: list[dict[str, Any]]) -> list[dict[s
 _FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.MULTILINE)
 
 
-def _parse_and_validate(text: str) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
+def _enrich_surface(
+    components: list[dict[str, Any]], lang: str, caption: str
+) -> list[dict[str, Any]]:
+    """Deterministic product guarantees around otherwise model-owned layouts.
+
+    A recipe always gets one visual, derived from its own generated title and
+    summary, and every finished answer gets follow-ups. The model still owns
+    the rest of the composition and content.
+    """
+    root = next((c for c in components if c.get("id") == "root"), None)
+    if root is None:
+        return components
+    children = list(root.get("children") or [])
+    types = {str(c.get("component")) for c in components}
+
+    if "RecipeCard" in types and "GeneratedVisual" not in types:
+        recipe = next(c for c in components if c.get("component") == "RecipeCard")
+        title = str(recipe.get("title") or "the finished dish")
+        summary = str(recipe.get("summary") or "freshly prepared and ready to serve")
+        visual_id = "recipe_visual"
+        existing_ids = {str(c.get("id")) for c in components}
+        suffix = 2
+        while visual_id in existing_ids:
+            visual_id = f"recipe_visual_{suffix}"
+            suffix += 1
+        visual = {
+            "id": visual_id,
+            "component": "GeneratedVisual",
+            "prompt": (
+                f"A finished serving of {title}; {summary}. Three-quarter close view "
+                "with the key ingredients visible nearby, appetizing and natural."
+            )[:500],
+            "alt": (title if len(title.strip()) >= 3 else "Finished dish")[:180],
+            "aspectRatio": "landscape",
+        }
+        recipe_id = str(recipe.get("id"))
+        insert_at = children.index(recipe_id) if recipe_id in children else 0
+        children.insert(insert_at, visual_id)
+        components.append(visual)
+
+    if "FollowUpChips" not in types:
+        chips_id = "follow_up"
+        existing_ids = {str(c.get("id")) for c in components}
+        suffix = 2
+        while chips_id in existing_ids:
+            chips_id = f"follow_up_{suffix}"
+            suffix += 1
+        suggestions = _MOCK_CHIPS[lang]
+        if lang == "en" and caption:
+            subject = caption[:180]
+            suggestions = [
+                {"label": "Go deeper", "query": f"Tell me more about this: {subject}"},
+                {
+                    "label": "Make it practical",
+                    "query": f"Give me the most practical next step for this: {subject}",
+                },
+            ]
+        components.append(
+            {
+                "id": chips_id,
+                "component": "FollowUpChips",
+                "suggestions": suggestions,
+            }
+        )
+        children.append(chips_id)
+
+    root["children"] = children
+    return components
+
+
+def _parse_and_validate(
+    text: str, lang: str = "en"
+) -> tuple[str, list[dict[str, Any]], dict[str, Any]]:
     # Without JSON mode (grounding forbids it) models may wrap output in
     # markdown fences or append stray tokens — strip fences, take the first
     # complete object, tolerate literal newlines in strings.
@@ -286,6 +363,7 @@ def _parse_and_validate(text: str) -> tuple[str, list[dict[str, Any]], dict[str,
     payload, _ = json.JSONDecoder(strict=False).raw_decode(cleaned[start:])
     caption = str(payload["caption"])
     components = _normalize_component_shapes(flatten_components(payload["components"]))
+    components = _enrich_surface(components, lang, caption)
     data_model = payload.get("dataModel") or {}
     validate_surface(components)
     return caption, components, data_model
@@ -350,8 +428,8 @@ class _GenState:
         self.repair_turns: list[Turn] | None = None  # prompt to replay on repair
 
 
-def _set_parsed(state: _GenState, text: str) -> None:
-    state.caption, state.components, state.data_model = _parse_and_validate(text)
+def _set_parsed(state: _GenState, text: str, lang: str) -> None:
+    state.caption, state.components, state.data_model = _parse_and_validate(text, lang)
 
 
 async def _fast_json_pass(
@@ -386,7 +464,7 @@ async def _fast_json_pass(
         return
     state.repair_turns = turns
     try:
-        _set_parsed(state, buffer)
+        _set_parsed(state, buffer, lang)
     except json.JSONDecodeError:
         if not buffer.strip():
             raise
@@ -452,7 +530,7 @@ async def _grounded_pass(
         if _wants_search(text):
             raise ValueError("model requested search while search was enabled")
         state.repair_turns = turns
-        _set_parsed(state, text)
+        _set_parsed(state, text, lang)
         return
 
     if not text:
@@ -507,7 +585,7 @@ async def _data_pass(
                     yield a2ui.ndjson(a2ui.caption_message(surface_id, state.caption, lang))
         elif isinstance(event, Final):
             buffer = event.text
-    _set_parsed(state, buffer)
+    _set_parsed(state, buffer, lang)
 
 
 async def _compose_pass(
@@ -531,7 +609,7 @@ async def _compose_pass(
                     yield a2ui.ndjson(a2ui.caption_message(surface_id, state.caption, lang))
         elif isinstance(event, Final):
             buffer = event.text
-    _set_parsed(state, buffer)
+    _set_parsed(state, buffer, lang)
 
 
 async def generate_generic_stream(
@@ -603,7 +681,7 @@ async def generate_generic_stream(
         )
         try:
             final = await provider.complete(system, [*base[:-1], Turn("user", feedback)])
-            _set_parsed(state, final.text)
+            _set_parsed(state, final.text, lang)
         except Exception:
             log.warning("generic tier invalid after retry, degrading")
             _degrade(state, lang)

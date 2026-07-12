@@ -1,11 +1,11 @@
 {
-    "name": "timepass_app",
-    "short_name": "timepass_app",
+    "name": "Nakul",
+    "short_name": "Nakul",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FAF8F2",
+    "theme_color": "#1F1F1F",
+    "description": "Dynamic, visual answers for Indian daily life.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
