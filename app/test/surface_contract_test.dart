@@ -1,5 +1,5 @@
 // Renderer-side contract test: real orchestrator NDJSON (recorded in
-// test/fixtures/) must parse as A2UI v0.9.1, match the TimePass catalog, and
+// test/fixtures/) must parse as A2UI v0.9.1, match the Nakul catalog, and
 // render with data-model bindings resolved.
 //
 // Re-record fixtures after server changes:
@@ -7,17 +7,18 @@
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:genui/genui.dart';
 
-import 'package:timepass_app/catalog/schemas.g.dart' as generated;
-import 'package:timepass_app/catalog/timepass_catalog.dart';
+import 'package:nakul_app/catalog/schemas.g.dart' as generated;
+import 'package:nakul_app/catalog/nakul_catalog.dart';
 
 SurfaceController buildController() {
   final catalog = BasicCatalogItems.asCatalog().copyWith(
-    newItems: timepassCatalogItems(),
+    newItems: nakulCatalogItems(),
     catalogId: generated.catalogId,
   );
   final controller = SurfaceController(catalogs: [catalog]);
@@ -35,7 +36,7 @@ String feedFixture(SurfaceController controller, String name) {
   for (final line in lines) {
     if (line.trim().isEmpty) continue;
     final decoded = jsonDecode(line) as Map<String, Object?>;
-    if (decoded.containsKey('timepass')) continue; // caption extension line
+    if (decoded.containsKey('nakul')) continue; // caption extension line
     if (decoded.containsKey('createSurface')) {
       surfaceId = ((decoded['createSurface'] as Map)['surfaceId']) as String;
     }
@@ -62,8 +63,9 @@ Future<void> pumpSurface(
 }
 
 void main() {
-  testWidgets('cricket surface renders with bindings resolved (hi)',
-      (tester) async {
+  testWidgets('cricket surface renders with bindings resolved (hi)', (
+    tester,
+  ) async {
     final controller = buildController();
     final surfaceId = feedFixture(controller, 'cricket_hi');
     await pumpSurface(tester, controller, surfaceId);
@@ -78,8 +80,9 @@ void main() {
     expect(find.byType(ActionChip), findsWidgets);
   });
 
-  testWidgets('weather surface renders forecast and IMD alert (en)',
-      (tester) async {
+  testWidgets('weather surface renders forecast and IMD alert (en)', (
+    tester,
+  ) async {
     final controller = buildController();
     final surfaceId = feedFixture(controller, 'weather_en');
     await pumpSurface(tester, controller, surfaceId);
@@ -89,8 +92,9 @@ void main() {
     expect(find.textContaining('orange alert'), findsOneWidget);
   });
 
-  testWidgets('panchang surface renders localized Telugu strings',
-      (tester) async {
+  testWidgets('panchang surface renders localized Telugu strings', (
+    tester,
+  ) async {
     final controller = buildController();
     final surfaceId = feedFixture(controller, 'panchang_te');
     await pumpSurface(tester, controller, surfaceId);
@@ -99,67 +103,105 @@ void main() {
     expect(find.textContaining('Rahu kalam'), findsOneWidget);
   });
 
-  testWidgets('comparison table and interactive checklist render + toggle',
-      (tester) async {
-    final controller = buildController();
-    final surfaceId = feedFixture(controller, 'generic_comparison');
-    await pumpSurface(tester, controller, surfaceId);
+  testWidgets(
+    'comparison table and interactive checklist render + toggle',
+    (tester) async {
+      final controller = buildController();
+      final surfaceId = feedFixture(controller, 'generic_comparison');
+      await pumpSurface(tester, controller, surfaceId);
 
-    expect(find.text('Mutual Funds vs FD'), findsOneWidget);
-    expect(find.text('Market-linked'), findsOneWidget);
-    expect(find.text('Returns are indicative.'), findsOneWidget);
-    expect(find.byType(CheckboxListTile), findsNWidgets(3));
-    // SourceChips renders one chip per source, labeled by domain
-    expect(find.text('groww.in'), findsOneWidget);
-    expect(find.text('rbi.org.in'), findsOneWidget);
+      expect(find.text('Mutual Funds vs FD'), findsOneWidget);
+      expect(find.text('Market-linked'), findsOneWidget);
+      expect(find.text('Returns are indicative.'), findsOneWidget);
+      expect(find.byType(CheckboxListTile), findsNWidgets(3));
+      // SourceChips renders one chip per source, labeled by domain
+      expect(find.text('groww.in'), findsOneWidget);
+      expect(find.text('rbi.org.in'), findsOneWidget);
 
-    final toggles = <Map<String, Object?>>[];
-    final sub = controller.onSubmit.listen((message) {
-      for (final part in message.parts.uiInteractionParts) {
-        final decoded = jsonDecode(part.interaction) as Map<String, Object?>;
-        final action = (decoded['action'] as Map).cast<String, Object?>();
-        if (action['name'] == 'checklist_toggled') {
-          toggles.add((action['context'] as Map).cast<String, Object?>());
+      final toggles = <Map<String, Object?>>[];
+      final sub = controller.onSubmit.listen((message) {
+        for (final part in message.parts.uiInteractionParts) {
+          final decoded = jsonDecode(part.interaction) as Map<String, Object?>;
+          final action = (decoded['action'] as Map).cast<String, Object?>();
+          if (action['name'] == 'checklist_toggled') {
+            toggles.add((action['context'] as Map).cast<String, Object?>());
+          }
         }
-      }
-    });
-    addTearDown(sub.cancel);
+      });
+      addTearDown(sub.cancel);
 
-    final kycTile = find.widgetWithText(CheckboxListTile, 'Complete KYC');
-    tester.widget<CheckboxListTile>(kycTile).onChanged!(true);
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+      final kycTile = find.widgetWithText(CheckboxListTile, 'Complete KYC');
+      tester.widget<CheckboxListTile>(kycTile).onChanged!(true);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(toggles, [
-      {'itemId': 'kyc', 'checked': true},
-    ]);
-  }, timeout: const Timeout(Duration(seconds: 30)));
+      expect(toggles, [
+        {'itemId': 'kyc', 'checked': true},
+      ]);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 
-  testWidgets('follow-up chip tap dispatches follow_up_selected',
-      (tester) async {
-    final controller = buildController();
-    final surfaceId = feedFixture(controller, 'weather_en');
-    await pumpSurface(tester, controller, surfaceId);
+  testWidgets(
+    'follow-up chip tap dispatches follow_up_selected',
+    (tester) async {
+      final controller = buildController();
+      final surfaceId = feedFixture(controller, 'weather_en');
+      await pumpSurface(tester, controller, surfaceId);
 
-    final queries = <String>[];
-    final sub = controller.onSubmit.listen((message) {
-      for (final part in message.parts.uiInteractionParts) {
-        final decoded = jsonDecode(part.interaction) as Map<String, Object?>;
-        final action = (decoded['action'] as Map).cast<String, Object?>();
-        if (action['name'] == 'follow_up_selected') {
-          queries.add(
-              ((action['context'] as Map)['query'] as String?) ?? '');
+      final queries = <String>[];
+      final sub = controller.onSubmit.listen((message) {
+        for (final part in message.parts.uiInteractionParts) {
+          final decoded = jsonDecode(part.interaction) as Map<String, Object?>;
+          final action = (decoded['action'] as Map).cast<String, Object?>();
+          if (action['name'] == 'follow_up_selected') {
+            queries.add(((action['context'] as Map)['query'] as String?) ?? '');
+          }
         }
-      }
-    });
-    addTearDown(sub.cancel);
+      });
+      addTearDown(sub.cancel);
 
-    // Chips can sit below the test viewport's fold; invoke the handler
-    // directly — this test covers event plumbing, not hit-testing.
-    tester.widget<ActionChip>(find.byType(ActionChip).first).onPressed!();
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 50));
+      // Chips can sit below the test viewport's fold; invoke the handler
+      // directly — this test covers event plumbing, not hit-testing.
+      tester.widget<ActionChip>(find.byType(ActionChip).first).onPressed!();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-    expect(queries, ['hourly weather today']);
-  }, timeout: const Timeout(Duration(seconds: 30)));
+      expect(queries, ['hourly weather today']);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
+
+  testWidgets(
+    'visual, chart, timeline, and recipe compose into one answer',
+    (tester) async {
+      final originalLoader = nakulVisualLoader;
+      nakulVisualLoader = (_, _) async => Uint8List.fromList(
+        base64Decode(
+          'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+        ),
+      );
+      addTearDown(() => nakulVisualLoader = originalLoader);
+
+      final controller = buildController();
+      final surfaceId = feedFixture(controller, 'visual_rich_answer');
+      await pumpSurface(tester, controller, surfaceId);
+      await tester.pumpAndSettle();
+
+      expect(find.text("Tonight's idea"), findsOneWidget);
+      expect(find.byType(Image), findsOneWidget);
+      expect(find.text('Time by stage'), findsOneWidget);
+      expect(find.text('Dinner flow'), findsOneWidget);
+      expect(find.text('Lemon rice'), findsOneWidget);
+      expect(find.text('What you need'), findsOneWidget);
+      expect(find.text('Step by step'), findsOneWidget);
+
+      final secondStep = find.widgetWithText(ChoiceChip, '2');
+      await tester.ensureVisible(secondStep);
+      await tester.tap(secondStep);
+      await tester.pumpAndSettle();
+      expect(find.text('Fold in the rice'), findsOneWidget);
+    },
+    timeout: const Timeout(Duration(seconds: 30)),
+  );
 }

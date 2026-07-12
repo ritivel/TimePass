@@ -60,9 +60,9 @@ async def run_query(client: httpx.AsyncClient, base: str, q: str, lang: str) -> 
                     continue
                 msg = json.loads(line)
                 now = time.monotonic() - t0
-                if "timepass" in msg:
+                if "nakul" in msg:
                     record["t_caption"] = round(now, 2)
-                    record["caption"] = msg["timepass"]["caption"]
+                    record["caption"] = msg["nakul"]["caption"]
                 elif "updateComponents" in msg:
                     last_components = msg["updateComponents"]["components"]
                     record["t_final"] = round(now, 2)

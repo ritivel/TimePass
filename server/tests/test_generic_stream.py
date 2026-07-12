@@ -9,10 +9,10 @@ import json
 
 import pytest
 
-import timepass_server.llm as llm
-from timepass_server.llm import generate_generic_stream
-from timepass_server.llm.base import Chunk, Final, Provider, Source, Turn
-from timepass_server.validator import validate_surface
+import nakul_server.llm as llm
+from nakul_server.llm import generate_generic_stream
+from nakul_server.llm.base import Chunk, Final, Provider, Source, Turn
+from nakul_server.validator import validate_surface
 
 GROUNDED_TEXT = (
     "Gold is trading at ₹78,450 per 10g in Hyderabad today. Prices rose after "
@@ -77,7 +77,7 @@ async def _run(provider, query, lang="en"):
 
 
 def _captions(lines):
-    return [m["timepass"]["caption"] for m in lines if "timepass" in m]
+    return [m["nakul"]["caption"] for m in lines if "nakul" in m]
 
 
 def _component_updates(lines):

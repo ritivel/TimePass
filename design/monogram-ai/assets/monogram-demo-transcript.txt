@@ -1,0 +1,41 @@
+When I tried ChatGPT for the first time, like everyone else, I was blown away.
+Being able to ask any question and getting an intelligent answer was nothing short of groundbreaking.
+But the user interface...
+Felt like we had gone all the way back to the command line days.
+I was at Airbnb at the time, and it was clear that chat wasn't the right interface for travel or many other use cases.
+We needed something more visual and interactive. Fast forward a few years.
+I was talking to our co-founder Murat, and he had this idea. What if AI could generate the entire user interface based on new questions? But for a magical user experience, this had to be done in just a few seconds.
+It definitely wasn't easy.
+But we think we made it work. Let me show you Monogram, the first AI with an intuitive visual interface. I promise, it will make sense when you see it.
+Let's start with a simple example.
+Can you show me all the TV shows which have a new season coming out this year?
+Monogram is getting data from multiple sources, and when ready, it generates a visual response in just a few seconds.
+In this case, it decided to display TV shows organized by themes. But if I was asking a slightly different question, like...
+Can you just pick one of these for me to watch tonight?
+It will choose a different layout with a few large cards and more details.
+I can tap one of these cards.
+MonaGram decides what to show me next.
+In this case, the details of the TV show.
+It's important to note that we don't have templates for TV shows, movies, or anything else.
+All the content interface decisions you are seeing are made on the fly, but we optimized the model to consistently generate well-crafted interfaces. Monogram even decided to add a watch button. Let's see if it works.
+OK.
+I'll go back.
+Because Monogram knows which other apps I have installed on my phone, it can deep into content accurately or send you to a website. This is one of the many things you can do on Monogram.
+But now let's try something different.
+Can you give me a recipe for Turkish stuffed eggplants, but use lentils instead of ground beef?
+Let's give it a couple seconds.
+This time, it created an interface with ingredients, step-by-step instructions, and more things I can do, like creating a shopping list or modifying this recipe.
+Now we will try something more complicated. Maybe we are trying to plan a trip.
+Can you help me schedule a trip to Yosemite this weekend with my kids?
+this time Monogram decided to verify some details.
+It makes some reasonable assumptions based on what it already knows about me, and allows me to change any of the details. Our interaction model blends natural language with more familiar UI affordances.
+When I'm choosing dates, it's easier to look at a calendar.
+Similarly, option pickers reduce the cognitive load of decisions.
+OK, this sounds good. Let's continue.
+OK.
+Looking at hotel data, getting information from various resources.
+And let's see what it will show me. Okay, now it show me some hotels I can stay. You can obviously click on them to get more details. Some outing ideas, scenic anchors.
+In a day-by-day trip plan.
+You guys get the idea.
+It makes a big difference when AI can generate interfaces on the fly.
+Just like graphical user interfaces did for personal computers, we believe that making AI easier to use will help it benefit more people.

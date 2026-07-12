@@ -10,8 +10,8 @@ import json
 import httpx
 import pytest
 
-from timepass_server import voice
-from timepass_server.main import app
+from nakul_server import voice
+from nakul_server.main import app
 
 FAKE_WAV = b"RIFF....WAVEfmt fake-audio-bytes"
 

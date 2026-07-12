@@ -1,4 +1,4 @@
-# TimePass component catalog — SOURCE OF TRUTH (M0 subset)
+# Nakul component catalog — SOURCE OF TRUTH (M0 subset)
 # Full contract with wireframes and rationale: COMPONENT_CATALOG.md
 # Regenerate artifacts after editing:  uv run catalog/generator/generate.py
 #
@@ -11,36 +11,41 @@
 #   items:     item spec for arrays (type or {fields})
 #   minItems / maxItems, default, description
 
-catalogId: "https://timepass.app/catalogs/core/v1"
+catalogId: "https://nakul.app/catalogs/core/v1"
 protocol: "v0.9.1"
 
 # Model-facing composition rules — compiled verbatim into the system prompt.
 # Keep under ~600 tokens (COMPONENT_CATALOG.md §9).
 instructions: |
-  You compose answer surfaces from the components in this catalog. Rules:
-  1. The surface root is one Column with id "root". Order of its children:
-     optional Notice (compliance), 1-8 answer blocks, optional single action
-     component, optional SourceChips, optional AdSlot (never first), and
-     FollowUpChips last (include it by default with 2-4 suggestions).
-  2. Only Row, Column, Card, List have children; Card and Button take one child.
-     All other components are leaves — never put components inside them.
-  3. Limits: nesting depth <= 4, <= 40 components, Row <= 4 children,
-     <= 2 hero components, <= 1 action component per surface.
-  4. Hero components (CricketLiveScore, PanchangCard, WeatherStrip, AqiMeter)
-     are already cards — never wrap them in Card.
-  5. If CricketLiveScore is present, the root MUST start with
-     Notice(variant: legal) disclosing the score delay.
-  6. Bind hero data with {"path": "/..."} references into the data model the
-     server provides — do not copy data values into component props.
-  7. Every user-visible string must be in the requested output language.
-     Use Latin digits. Never invent URLs; only use server-provided link fields.
-  8. Prefer one coarse hero component over rebuilding it from primitives.
-     For prose answers (letters, explanations) use Markdown — cards are not
-     mandatory. For labeled facts use KeyValueGrid; for comparing options use
-     ComparisonTable; for remedies/steps/preparation use Checklist.
-  9. Be compact: aim for 3-6 components total (plus FollowUpChips). One good
-     Markdown or one ComparisonTable beats six stacked sections. Long answers
-     are slower and worse — say it once, visually.
+  Compose a visual answer mini-app, not a chat transcript. Rules:
+  1. Root is one Column with id "root". Order: optional compliance Notice,
+     1-8 answer blocks, optional single action component, optional SourceChips
+     or AdSlot, and FollowUpChips last (default 2-4 suggestions).
+  2. Pick a layout by intent: status/current data -> one hero plus next action;
+     compare/choose -> ComparisonTable plus a short recommendation; numeric
+     trend/breakdown -> ChartCard; schedule/plan/trip -> TimelineCard; recipe ->
+     RecipeCard; how-to, packing, prep -> Checklist plus compact notes; simple
+     prose/draft -> Markdown only when a visual structure would be worse.
+  3. Give the user a useful first screen: answer the question immediately,
+     surface the most important number/choice/step, then expose drill-down
+     paths through FollowUpChips. Avoid long walls of Markdown.
+  4. Only Row, Column, Card, List have children; Card and Button take one child.
+     All other components are leaves. Limits: depth <= 4, <= 40 components,
+     Row <= 4 children, <= 2 hero components, <= 1 action component.
+  5. Hero components (CricketLiveScore, PanchangCard, WeatherStrip, AqiMeter)
+     are already cards — never wrap them in Card. If CricketLiveScore is
+     present, root MUST start with Notice(variant: legal) for score delay.
+  6. Bind hero data with {"path": "/..."} references into server dataModel.
+     Do not copy those values into props.
+  7. Every visible string must be in the requested output language. Use Latin
+     digits. Never invent URLs; only use server-provided link fields.
+  8. Be compact: aim for 3-6 components plus FollowUpChips. Prefer one strong
+     structured surface over many weak sections.
+  9. Use at most one GeneratedVisual when imagery materially helps: recipes,
+     places, products, stories, culture, style inspiration, or explaining a
+     physical concept. Its prompt describes only the subject and composition;
+     request no text, letters, logos, UI, charts, maps, or factual labels. Do
+     not use GeneratedVisual as evidence for live facts or exact comparisons.
 
 components:
 
@@ -282,6 +287,105 @@ components:
     events:
       source_opened: {url: string}
 
+  GeneratedVisual:
+    layer: generic
+    m0: false
+    description: >
+      One model-generated editorial visual that makes an answer easier or more
+      delightful to understand. The server applies Nakul's fixed soft-3D art
+      direction and safety rules; the model supplies subject/composition only.
+      Never use for factual charts, maps, text-bearing graphics, or live proof.
+    props:
+      prompt:
+        type: string
+        required: true
+        minLength: 8
+        maxLength: 500
+        description: Concrete visual subject and composition. No text, logos, UI, charts, or URLs.
+      alt: {type: string, required: true, minLength: 3, maxLength: 180, description: Accessible description in the output language.}
+      title: {type: string, maxLength: 90}
+      caption: {type: string, maxLength: 180}
+      aspectRatio: {type: string, enum: [landscape, square, portrait], default: landscape}
+
+  ChartCard:
+    layer: generic
+    m0: false
+    description: >
+      Compact bar, line, or donut chart for numeric patterns. Use only when the
+      supplied numbers are meaningful; include displayValue for readable labels.
+    props:
+      title: {type: string, required: true}
+      subtitle: {type: string}
+      type: {type: string, required: true, enum: [bar, line, donut]}
+      series:
+        type: array
+        required: true
+        minItems: 2
+        maxItems: 8
+        items:
+          fields:
+            label: {type: string, required: true}
+            value: {type: number, required: true}
+            displayValue: {type: string, required: true}
+            tone: {type: string, enum: [ink, green, amber, red, blue], default: ink}
+      footnote: {type: string}
+
+  TimelineCard:
+    layer: generic
+    m0: false
+    description: >
+      Ordered schedule, itinerary, process, or journey. Use timeLabel for times,
+      days, or sequence markers and keep each item actionable and compact.
+    props:
+      title: {type: string, required: true}
+      subtitle: {type: string}
+      items:
+        type: array
+        required: true
+        minItems: 2
+        maxItems: 12
+        items:
+          fields:
+            timeLabel: {type: string, required: true}
+            title: {type: string, required: true}
+            detail: {type: string}
+            status: {type: string, enum: [upcoming, active, done, warning], default: upcoming}
+      footnote: {type: string}
+
+  RecipeCard:
+    layer: generic
+    m0: false
+    description: >
+      Interactive recipe overview with ingredients and tappable step cards.
+      Pair with one GeneratedVisual when a finished-dish visual adds value.
+    props:
+      title: {type: string, required: true}
+      summary: {type: string}
+      servingsText: {type: string}
+      totalTimeText: {type: string}
+      ingredients:
+        type: array
+        required: true
+        minItems: 2
+        maxItems: 16
+        items:
+          fields:
+            name: {type: string, required: true}
+            amount: {type: string, required: true}
+      steps:
+        type: array
+        required: true
+        minItems: 2
+        maxItems: 12
+        items:
+          fields:
+            title: {type: string, required: true}
+            detail: {type: string, required: true}
+            durationText: {type: string}
+      tips: {type: array, maxItems: 4, items: {type: string}}
+    events:
+      recipe_step_selected: {stepIndex: integer}
+
   # ── Layer 2: hero components (M0 subset) ────────────────────────────────
 
   CricketLiveScore:
@@ -440,14 +544,12 @@ reserved:
   - MediaCarousel
   # (SourceChips promoted 2026-07-08 — server-appended from grounding metadata)
   - MapCard
-  - ChartCard
   - CricketMatchSummary
   - TrainStatusTimeline
   - PnrStatusCard
   - MuhuratList
   - HoroscopeCard
   - PriceTicker
-  - RecipeCard
   - UpiPayButton
   - AffiliateCta
   - ConsultReferralCard

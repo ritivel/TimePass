@@ -10,9 +10,9 @@ import json
 import httpx
 import pytest
 
-from timepass_server.main import app
-from timepass_server.router import Category, route
-from timepass_server.validator import SurfaceValidationError, validate_surface
+from nakul_server.main import app
+from nakul_server.router import Category, route
+from nakul_server.validator import SurfaceValidationError, validate_surface
 
 
 @pytest.fixture
@@ -68,14 +68,14 @@ async def test_scripted_queries(client, query, lang, expected_component):
     messages = parse_ndjson(resp.text)
 
     # exactly one caption extension line, non-empty, right language
-    captions = [m["timepass"] for m in messages if "timepass" in m]
+    captions = [m["nakul"] for m in messages if "nakul" in m]
     assert len(captions) == 1
     assert captions[0]["caption"]
     assert captions[0]["lang"] == lang
 
     # A2UI sequence: starts with createSurface, ends with updateComponents
     # (the generic tier streams a placeholder surface in between).
-    a2ui_msgs = [m for m in messages if "timepass" not in m]
+    a2ui_msgs = [m for m in messages if "nakul" not in m]
     kinds = [next(k for k in m if k != "version") for m in a2ui_msgs]
     assert kinds[0] == "createSurface"
     assert kinds[-1] == "updateComponents"
@@ -161,6 +161,44 @@ def test_rejects_bad_prop_values():
         )
 
 
+def test_rejects_model_fabricated_button_urls():
+    with pytest.raises(SurfaceValidationError, match="literal URLs"):
+        validate_surface(
+            [
+                {
+                    "id": "root",
+                    "component": "Column",
+                    "children": ["label", "cta", "chips"],
+                },
+                {"id": "label", "component": "Text", "text": "Open this"},
+                {
+                    "id": "cta_label",
+                    "component": "Text",
+                    "text": "Search web",
+                },
+                {
+                    "id": "cta",
+                    "component": "Button",
+                    "child": "cta_label",
+                    "action": {
+                        "event": {
+                            "name": "open_url",
+                            "context": {"url": "https://example.com"},
+                        }
+                    },
+                },
+                {
+                    "id": "chips",
+                    "component": "FollowUpChips",
+                    "suggestions": [
+                        {"label": "More", "query": "tell me more"},
+                        {"label": "Shorter", "query": "make it shorter"},
+                    ],
+                },
+            ]
+        )
+
+
 def test_rejects_dangling_child_ref():
     with pytest.raises(SurfaceValidationError, match="does not exist"):
         validate_surface(
@@ -176,7 +214,7 @@ def test_rejects_missing_root():
 # ── CPCB AQI adapter (no network — canned records) ─────────────────────────
 
 def test_aqi_city_rollup_and_categories():
-    from timepass_server.adapters.aqi import category_for, city_from_query, summarize_records
+    from nakul_server.adapters.aqi import category_for, city_from_query, summarize_records
 
     records = [
         # station A: PM2.5 dominant, AQI 210
@@ -207,7 +245,7 @@ def test_aqi_city_rollup_and_categories():
 
 
 def test_aqi_all_na_returns_none():
-    from timepass_server.adapters.aqi import summarize_records
+    from nakul_server.adapters.aqi import summarize_records
 
     assert summarize_records(
         [{"station": "A", "pollutant_id": "SO2", "avg_value": "NA",
@@ -218,7 +256,7 @@ def test_aqi_all_na_returns_none():
 # ── LLM output normalization ───────────────────────────────────────────────
 
 def test_flatten_nested_llm_output():
-    from timepass_server.a2ui import flatten_components
+    from nakul_server.a2ui import flatten_components
 
     nested = [
         {
@@ -245,7 +283,7 @@ def test_flatten_nested_llm_output():
 
 
 def test_llm_output_normalization():
-    from timepass_server.llm import _parse_and_validate
+    from nakul_server.llm import _parse_and_validate
 
     # keyed cells (LLM shape mistake) + trailing garbage after the JSON object
     raw = json.dumps({
@@ -273,7 +311,7 @@ def test_llm_output_normalization():
 
 
 def test_freshness_gate():
-    from timepass_server.llm import needs_freshness
+    from nakul_server.llm import needs_freshness
 
     assert needs_freshness("what is the current repo rate in india")
     assert needs_freshness("petrol price today")
@@ -285,17 +323,52 @@ def test_freshness_gate():
 
 
 def test_parser_strips_markdown_fences():
-    from timepass_server.llm import _parse_and_validate
+    from nakul_server.llm import _parse_and_validate
 
     raw = '```json\n{"caption": "Hi.", "components": [{"id": "root", "component": "Column", "children": ["a"]}, {"id": "a", "component": "Markdown", "text": "hello"}]}\n```'
     caption, components, _ = _parse_and_validate(raw)
     assert caption == "Hi."
-    assert len(components) == 2
+    assert len(components) == 3
+    assert components[-1]["component"] == "FollowUpChips"
+
+
+def test_recipe_is_enriched_with_visual_and_contextual_followups():
+    from nakul_server.llm import _parse_and_validate
+
+    raw = json.dumps({
+        "caption": "A quick lemon rice dinner for two.",
+        "components": [
+            {"id": "root", "component": "Column", "children": ["recipe"]},
+            {
+                "id": "recipe",
+                "component": "RecipeCard",
+                "title": "Lemon rice",
+                "ingredients": [
+                    {"name": "Rice", "amount": "2 cups"},
+                    {"name": "Lemon", "amount": "2 tbsp"},
+                ],
+                "steps": [
+                    {"title": "Temper", "detail": "Toast the spices."},
+                    {"title": "Finish", "detail": "Fold in lemon off heat."},
+                ],
+            },
+        ],
+    })
+    _, components, _ = _parse_and_validate(raw, "en")
+    types = [component["component"] for component in components]
+    assert types.count("GeneratedVisual") == 1
+    assert types.count("FollowUpChips") == 1
+    root = next(component for component in components if component["id"] == "root")
+    assert root["children"][-1].startswith("follow_up")
+    visual = next(component for component in components if component["component"] == "GeneratedVisual")
+    assert "Lemon rice" in visual["prompt"]
+    chips = next(component for component in components if component["component"] == "FollowUpChips")
+    assert "A quick lemon rice dinner" in chips["suggestions"][0]["query"]
 
 
 def test_attach_sources_inserts_before_chips():
-    from timepass_server.llm import _attach_sources
-    from timepass_server.llm.base import Source
+    from nakul_server.llm import _attach_sources
+    from nakul_server.llm.base import Source
 
     components = [
         {"id": "root", "component": "Column", "children": ["answer", "chips"]},
@@ -324,7 +397,7 @@ async def test_history_accepted(client):
 # ── live refresh ───────────────────────────────────────────────────────────
 
 async def test_cricket_marks_surface_live_and_streams_refreshes(client, monkeypatch):
-    from timepass_server import main as main_module
+    from nakul_server import main as main_module
 
     monkeypatch.setattr(main_module, "LIVE_REFRESH_SECONDS", 0.01)
     # Short TTL so the server-side generator ends promptly — under the ASGI
@@ -336,7 +409,7 @@ async def test_cricket_marks_surface_live_and_streams_refreshes(client, monkeypa
         "/v1/query", json={"query": "ind vs aus score", "lang": "en", "surfaceId": "live_t1"}
     )
     messages = parse_ndjson(resp.text)
-    ext = next(m["timepass"] for m in messages if "timepass" in m)
+    ext = next(m["nakul"] for m in messages if "nakul" in m)
     assert ext.get("live") is True
 
     # subscribe and read two refreshes
@@ -360,7 +433,7 @@ async def test_live_unknown_surface_404(client):
 
 
 def test_normalizer_prunes_hallucinated_props():
-    from timepass_server.llm import _parse_and_validate
+    from nakul_server.llm import _parse_and_validate
 
     raw = json.dumps({
         "caption": "Done.",
