@@ -8,6 +8,8 @@ import '../theme/tp_theme.dart';
 import 'legal_screen.dart';
 import 'product_backend.dart';
 
+const _googleAuthEnabled = bool.fromEnvironment('GOOGLE_AUTH_ENABLED');
+
 class AuthGate extends StatefulWidget {
   const AuthGate({required this.signedInBuilder, super.key});
 
@@ -287,28 +289,30 @@ class _GuestUpgradeSheetState extends State<_GuestUpgradeSheet> {
             style: TextStyle(color: t.inkMuted, height: 1.45),
           ),
           const SizedBox(height: 24),
-          FilledButton.icon(
-            onPressed: _busy ? null : _linkGoogle,
-            style: FilledButton.styleFrom(
-              minimumSize: const Size.fromHeight(52),
-            ),
-            icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-            label: const Text('Continue with Google'),
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              const Expanded(child: Divider()),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                child: Text(
-                  'or use email',
-                  style: TextStyle(color: t.inkMuted),
-                ),
+          if (_googleAuthEnabled) ...[
+            FilledButton.icon(
+              onPressed: _busy ? null : _linkGoogle,
+              style: FilledButton.styleFrom(
+                minimumSize: const Size.fromHeight(52),
               ),
-              const Expanded(child: Divider()),
-            ],
-          ),
+              icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+              label: const Text('Continue with Google'),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                const Expanded(child: Divider()),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Text(
+                    'or use email',
+                    style: TextStyle(color: t.inkMuted),
+                  ),
+                ),
+                const Expanded(child: Divider()),
+              ],
+            ),
+          ],
           const SizedBox(height: 18),
           TextField(
             controller: _email,
@@ -589,15 +593,17 @@ class _AuthScreenState extends State<_AuthScreen> {
                         child: const Text('Forgot password?'),
                       ),
                     const SizedBox(height: 4),
-                    OutlinedButton.icon(
-                      onPressed: _busy ? null : _google,
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size.fromHeight(50),
+                    if (_googleAuthEnabled) ...[
+                      OutlinedButton.icon(
+                        onPressed: _busy ? null : _google,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(50),
+                        ),
+                        icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
+                        label: const Text('Continue with Google'),
                       ),
-                      icon: const Icon(Icons.g_mobiledata_rounded, size: 28),
-                      label: const Text('Continue with Google'),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
+                    ],
                     TextButton(
                       onPressed: _busy
                           ? null

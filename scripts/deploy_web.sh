@@ -17,6 +17,7 @@ flutter build web --release \
   --dart-define="SUPABASE_PUBLISHABLE_KEY=${SUPABASE_PUBLISHABLE_KEY}" \
   --dart-define="TURNSTILE_SITE_KEY=${TURNSTILE_SITE_KEY}" \
   --dart-define="TURNSTILE_BASE_URL=${TURNSTILE_BASE_URL}" \
+  --dart-define="GOOGLE_AUTH_ENABLED=${GOOGLE_AUTH_ENABLED:-false}" \
   --dart-define="NAKUL_AUTH_REDIRECT=${NAKUL_AUTH_REDIRECT:-app.nakul://auth-callback/}" \
   --dart-define="NAKUL_SUPPORT_EMAIL=${NAKUL_SUPPORT_EMAIL:-support@nakul.app}"
 
