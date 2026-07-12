@@ -2,6 +2,7 @@ services:
   - type: web
     name: nakul-api
     runtime: docker
+    repo: https://github.com/ritivel/Nakul
     branch: codex/monogram-ui
     plan: starter
     region: singapore
