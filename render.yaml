@@ -2,6 +2,7 @@ services:
   - type: web
     name: nakul-api
     runtime: docker
+    branch: codex/monogram-ui
     plan: starter
     region: singapore
     dockerfilePath: ./server/Dockerfile

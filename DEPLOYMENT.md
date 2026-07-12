@@ -34,8 +34,9 @@ whose `user_id` matches `auth.uid()`.
 
 ## 2. Render API
 
-Create a Blueprint from `render.yaml`. Render prompts for every secret marked
-`sync: false`:
+Create a Blueprint from `render.yaml` using the verified deployment branch:
+`https://dashboard.render.com/blueprint/new?repo=https://github.com/ritivel/Nakul/tree/codex/monogram-ui`.
+Render prompts for every secret marked `sync: false`:
 
 - `NAKUL_ALLOWED_ORIGINS`: exact Cloudflare production origin, with preview
   origins added only when intentionally supported.
