@@ -4,12 +4,11 @@ services:
     runtime: docker
     repo: https://github.com/ritivel/Nakul
     branch: codex/monogram-ui
-    plan: starter
+    plan: free
     region: singapore
     dockerfilePath: ./server/Dockerfile
     dockerContext: .
     healthCheckPath: /healthz
-    maxShutdownDelaySeconds: 60
     autoDeployTrigger: commit
     envVars:
       - key: NAKUL_REQUIRE_AUTH
